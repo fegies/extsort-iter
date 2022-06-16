@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{self, Read, Write},
+    io::{self, ErrorKind, Read, Seek, Write},
     mem::{self, MaybeUninit},
     path::Path,
 };
@@ -27,7 +27,11 @@ impl<T> Drop for FileRun<T> {
 /// Allocates a new file and fills it with the values drained from source.
 /// When the call completes, source will be empty.
 fn fill_file<T>(source: &mut Vec<T>, filename: &Path) -> io::Result<File> {
-    let mut file = fs::OpenOptions::new().create_new(true).open(filename)?;
+    let mut file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .read(true)
+        .open(filename)?;
 
     // we immediately delete the file.
     // this has 2 advantages:
@@ -48,6 +52,9 @@ fn fill_file<T>(source: &mut Vec<T>, filename: &Path) -> io::Result<File> {
 
     // move the contents of the vec to the file.
     file.write_all(slice)?;
+
+    // seek to the beginning of the file to ensure that we will actually read its contents
+    file.seek(io::SeekFrom::Start(0))?;
 
     // we have conceptually moved all the data that our vec used to contain to disk.
     // in order to make sure that the drop functions are not called twice,
@@ -75,7 +82,7 @@ impl<T> FileRun<T> {
         let source = fill_file(source, filename)?;
         let mut buffer = Vec::with_capacity(buffer_size);
         for _ in 0..buffer_size {
-            buffer.push(MaybeUninit::uninit());
+            buffer.push(MaybeUninit::zeroed());
         }
 
         let mut res = Self {
@@ -87,13 +94,25 @@ impl<T> FileRun<T> {
         Ok(res)
     }
 
-    // refills the read buffer.
-    // this should only be called if the read_idx is at the end of the buffer
+    /// refills the read buffer.
+    /// this should only be called if the read_idx is at the end of the buffer
     fn refill_buffer(&mut self) {
+        /// keep retrying the read if it returns with
+        fn read_with_retry(source: &mut File, buffer: &mut [u8]) -> io::Result<usize> {
+            loop {
+                match source.read(buffer) {
+                    Ok(size) => break Ok(size),
+                    Err(e) if e.kind() == ErrorKind::Interrupted => {}
+                    err => break err,
+                }
+            }
+        }
+
         fn try_read_exact(source: &mut File, mut buffer: &mut [u8]) -> usize {
             let mut bytes_read = 0;
             while !buffer.is_empty() {
-                let read = source.read(buffer).expect("Unable to perform read on FileRun. This means that the file was modified from under us!");
+                // TODO: Interrupted error abfange
+                let read = read_with_retry(source, buffer).expect("Unable to perform read on FileRun. This means that the file was modified from under us!");
                 if read == 0 {
                     break;
                 }

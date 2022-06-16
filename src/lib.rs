@@ -1,11 +1,16 @@
 // struct SequentialSorter {}
 
+mod extension_trait;
 mod orderer;
 mod run;
 mod sorter;
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use crate::{extension_trait::ExtSortOrdExtension, sorter::ExtsortConfig};
+
     #[test]
     fn integration() {
         let sequence = [
@@ -16,7 +21,14 @@ mod tests {
             93, 60, 50, 13, 37, 87, 46, 96, 66, 98, 81, 9,
         ];
 
-        let data = sequence.iter();
+        let data = sequence
+            .iter()
+            .external_sort(ExtsortConfig {
+                sort_buffer_size: 10,
+                run_read_buffer_size: 5,
+                temp_file_folder: PathBuf::from("/tmp"),
+            })
+            .unwrap();
 
         fn is_sorted(mut source: impl Iterator<Item = impl Ord>) -> Option<bool> {
             let mut prev = source.next()?;

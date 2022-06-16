@@ -46,7 +46,7 @@ where
             return Ordering::Greater;
         };
 
-        self.orderer.compare(&left, &right).reverse()
+        self.orderer.compare(left, right).reverse()
     }
 }
 
