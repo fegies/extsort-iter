@@ -16,14 +16,12 @@ impl<T> BufRun<T> {
     }
 }
 
-impl<T> Run for BufRun<T> {
-    type Item = T;
-
-    fn peek(&self) -> Option<&Self::Item> {
+impl<T> Run<T> for BufRun<T> {
+    fn peek(&self) -> Option<&T> {
         self.source.as_slice().get(0)
     }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<T> {
         self.source.next()
     }
 }

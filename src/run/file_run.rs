@@ -124,10 +124,8 @@ impl<T> FileRun<T> {
     }
 }
 
-impl<T> Run for FileRun<T> {
-    type Item = T;
-
-    fn peek(&self) -> Option<&Self::Item> {
+impl<T> Run<T> for FileRun<T> {
+    fn peek(&self) -> Option<&T> {
         if self.read_idx >= self.buffer.len() {
             None
         } else {
@@ -139,7 +137,7 @@ impl<T> Run for FileRun<T> {
         }
     }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<T> {
         if self.read_idx >= self.buffer.len() {
             return None;
         }

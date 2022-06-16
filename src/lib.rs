@@ -1,6 +1,8 @@
 // struct SequentialSorter {}
 
+mod orderer;
 mod run;
+mod sorter;
 
 #[cfg(test)]
 mod tests {
