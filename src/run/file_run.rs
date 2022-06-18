@@ -223,6 +223,17 @@ mod test {
     use super::*;
 
     #[test]
+    fn file_run_works_with_vecs() {
+        let d = (1..100).collect::<Vec<_>>();
+        let data = vec![d; 10];
+        let mut run = FileRun::new(&mut data.clone(), Path::new("/tmp/foobar"), 2).unwrap();
+
+        assert_eq!(10, run.size_hint().0);
+        let collected = std::iter::from_fn(|| run.next()).collect::<Vec<_>>();
+        assert_eq!(data, collected);
+    }
+
+    #[test]
     fn file_run_works_with_zst() {
         let data = vec![(); 10];
         let mut run = FileRun::new(&mut data.clone(), Path::new("abc"), 2).unwrap();
