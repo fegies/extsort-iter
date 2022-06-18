@@ -213,8 +213,8 @@ impl<T> Run<T> for FileRun<T> {
         Some(result)
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.remaining_entries, Some(self.remaining_entries))
+    fn size_hint(&self) -> usize {
+        self.remaining_entries
     }
 }
 
@@ -228,7 +228,7 @@ mod test {
         let data = vec![d; 10];
         let mut run = FileRun::new(&mut data.clone(), Path::new("/tmp/foobar"), 2).unwrap();
 
-        assert_eq!(10, run.size_hint().0);
+        assert_eq!(10, run.size_hint());
         let collected = std::iter::from_fn(|| run.next()).collect::<Vec<_>>();
         assert_eq!(data, collected);
     }
@@ -238,7 +238,7 @@ mod test {
         let data = vec![(); 10];
         let mut run = FileRun::new(&mut data.clone(), Path::new("abc"), 2).unwrap();
 
-        assert_eq!(10, run.size_hint().0);
+        assert_eq!(10, run.size_hint());
 
         let collected = std::iter::from_fn(|| run.next()).collect::<Vec<_>>();
         assert_eq!(data, collected);

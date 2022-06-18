@@ -86,4 +86,11 @@ where
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.runs.iter().map(|r| r.run.size_hint()).sum();
+        (size, Some(size))
+    }
 }
+
+impl<T, O> ExactSizeIterator for ResultIterator<'_, T, O> where O: Orderer<T> {}

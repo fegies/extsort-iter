@@ -25,7 +25,7 @@ impl<T> Run<T> for BufRun<T> {
         self.source.next()
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.source.size_hint()
+    fn size_hint(&self) -> usize {
+        self.source.len()
     }
 }
