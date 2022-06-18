@@ -24,4 +24,8 @@ impl<T> Run<T> for BufRun<T> {
     fn next(&mut self) -> Option<T> {
         self.source.next()
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.source.size_hint()
+    }
 }

@@ -1,9 +1,13 @@
 // struct SequentialSorter {}
 
-mod extension_trait;
+pub mod extension_trait;
 mod orderer;
 mod run;
 mod sorter;
+
+pub use extension_trait::*;
+
+/// This crate
 
 #[cfg(test)]
 mod tests {
@@ -30,17 +34,8 @@ mod tests {
             })
             .unwrap();
 
-        fn is_sorted(mut source: impl Iterator<Item = impl Ord>) -> Option<bool> {
-            let mut prev = source.next()?;
-            for next in source {
-                if next < prev {
-                    return Some(false);
-                }
-                prev = next;
-            }
+        let is_sorted = data.zip(1..).all(|(l, r)| *l == r);
 
-            Some(true)
-        }
-        assert!(is_sorted(data).unwrap_or(true));
+        assert!(is_sorted);
     }
 }
