@@ -15,6 +15,36 @@ pub struct ExtsortConfig {
     pub temp_file_folder: PathBuf,
 }
 
+impl ExtsortConfig {
+    pub fn default_for<T>() -> Self {
+        let t_size = std::mem::size_of::<T>();
+        let sort_buf_bytes = 1_000_000;
+
+        let one = NonZeroUsize::new(1).unwrap();
+        let sort_count;
+        let run_count;
+        if t_size == 0 {
+            sort_count = one;
+            run_count = one;
+        } else {
+            sort_count = NonZeroUsize::new(sort_buf_bytes / t_size).unwrap_or(one);
+            run_count = NonZeroUsize::new(4096 / t_size).unwrap_or(one);
+        }
+
+        ExtsortConfig {
+            sort_buffer_size: sort_count,
+            run_read_size: run_count,
+            temp_file_folder: PathBuf::from("/tmp"),
+        }
+    }
+    pub fn temp_file_folder(self, folder: impl Into<PathBuf>) -> Self {
+        Self {
+            temp_file_folder: folder.into(),
+            ..self
+        }
+    }
+}
+
 pub struct ExtSorter {
     config: ExtsortConfig,
 }
