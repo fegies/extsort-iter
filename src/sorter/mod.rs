@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf, process};
+use std::{io, num::NonZeroUsize, path::PathBuf, process};
 
 use crate::{
     orderer::Orderer,
@@ -10,8 +10,7 @@ use self::result_iter::ResultIterator;
 pub mod result_iter;
 
 pub struct ExtsortConfig {
-    pub sort_buffer_size: usize,
-    pub run_read_buffer_size: usize,
+    pub sort_buffer_size: NonZeroUsize,
     pub temp_file_folder: PathBuf,
 }
 
@@ -33,7 +32,7 @@ impl ExtSorter {
         let pid = process::id();
         let self_addr = self as *const Self as usize;
 
-        let max_buffer_size = self.config.sort_buffer_size;
+        let max_buffer_size = self.config.sort_buffer_size.into();
         let mut sort_buffer = Vec::with_capacity(max_buffer_size);
         let mut sort_folder = self.config.temp_file_folder.clone();
         sort_folder.push("dummy");
@@ -51,7 +50,7 @@ impl ExtSorter {
                 file_runs.push(FileRun::new(
                     &mut sort_buffer,
                     &sort_folder,
-                    self.config.run_read_buffer_size,
+                    self.config.sort_buffer_size,
                 )?);
             }
         }

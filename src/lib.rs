@@ -9,9 +9,10 @@ pub use extension_trait::*;
 
 /// This crate
 
+#[cfg(not(miri))]
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{num::NonZeroUsize, path::PathBuf};
 
     use crate::{extension_trait::ExtSortOrdExtension, sorter::ExtsortConfig};
 
@@ -28,8 +29,7 @@ mod tests {
         let data = sequence
             .iter()
             .external_sort(ExtsortConfig {
-                sort_buffer_size: 10,
-                run_read_buffer_size: 5,
+                sort_buffer_size: NonZeroUsize::new(10).unwrap(),
                 temp_file_folder: PathBuf::from("/tmp"),
             })
             .unwrap();
