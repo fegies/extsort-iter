@@ -13,7 +13,7 @@ pub trait ExtSortOrdExtension<'a>: Iterator {
 }
 
 fn buffer_sort<T>(orderer: &impl Orderer<T>, buffer: &mut [T]) {
-    buffer.sort_by(|a, b| orderer.compare(a, b))
+    buffer.sort_unstable_by(|a, b| orderer.compare(a, b))
 }
 
 impl<'a, I, T> ExtSortOrdExtension<'a> for I

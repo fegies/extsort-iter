@@ -32,7 +32,7 @@ where
     T: Send,
     O: Orderer<T> + Sync,
 {
-    buffer.par_sort_by(|a, b| orderer.compare(a, b))
+    buffer.par_sort_unstable_by(|a, b| orderer.compare(a, b))
 }
 
 pub trait ParallelExtSortOrdExtension<'a>: Iterator
