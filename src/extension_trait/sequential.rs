@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, io};
 
 use crate::{
-    orderer::{FuncOrderer, KeyOrderer, OrdOrderer},
+    orderer::{FuncOrderer, KeyOrderer, OrdOrderer, Orderer},
     sorter::{self, result_iter::ResultIterator, ExtsortConfig},
 };
 
@@ -10,6 +10,10 @@ pub trait ExtSortOrdExtension<'a>: Iterator {
         self,
         options: ExtsortConfig,
     ) -> io::Result<ResultIterator<'a, Self::Item, OrdOrderer>>;
+}
+
+fn buffer_sort<T>(orderer: &impl Orderer<T>, buffer: &mut [T]) {
+    buffer.sort_by(|a, b| orderer.compare(a, b))
 }
 
 impl<'a, I, T> ExtSortOrdExtension<'a> for I
@@ -21,7 +25,7 @@ where
         self,
         options: ExtsortConfig,
     ) -> io::Result<ResultIterator<'a, Self::Item, OrdOrderer>> {
-        sorter::ExtSorter::new(options).run(self, OrdOrderer::new())
+        sorter::ExtSorter::new(options).run(self, OrdOrderer::new(), buffer_sort)
     }
 }
 
@@ -57,7 +61,7 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering,
     {
-        sorter::ExtSorter::new(options).run(self, FuncOrderer::new(comparator))
+        sorter::ExtSorter::new(options).run(self, FuncOrderer::new(comparator), buffer_sort)
     }
 
     fn external_sort_by_key<F, K>(
@@ -69,7 +73,7 @@ where
         F: Fn(&Self::Item) -> K,
         K: Ord,
     {
-        sorter::ExtSorter::new(options).run(self, KeyOrderer::new(key_extractor))
+        sorter::ExtSorter::new(options).run(self, KeyOrderer::new(key_extractor), buffer_sort)
     }
 }
 // impl<'a, I, T> ExtSortByExtension

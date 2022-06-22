@@ -23,11 +23,17 @@ impl ExtSorter {
         Self { config: options }
     }
 
-    pub fn run<'a, S, T, O>(&self, source: S, orderer: O) -> io::Result<ResultIterator<'a, T, O>>
+    pub fn run<'a, S, T, O, F>(
+        &self,
+        source: S,
+        orderer: O,
+        mut buffer_sort: F,
+    ) -> io::Result<ResultIterator<'a, T, O>>
     where
         S: Iterator<Item = T>,
         O: Orderer<T>,
         T: 'a,
+        F: FnMut(&O, &mut [T]),
     {
         let pid = process::id();
         let self_addr = self as *const Self as usize;
@@ -40,7 +46,7 @@ impl ExtSorter {
         for item in source {
             sort_buffer.push(item);
             if sort_buffer.len() == max_buffer_size {
-                sort_buffer.sort_by(|a, b| orderer.compare(a, b));
+                buffer_sort(&orderer, &mut sort_buffer);
                 sort_folder.set_file_name(format!(
                     "{}_{}_sort_file_{}",
                     pid,
