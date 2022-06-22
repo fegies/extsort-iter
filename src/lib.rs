@@ -30,6 +30,7 @@ mod tests {
             .iter()
             .external_sort(ExtsortConfig {
                 sort_buffer_size: NonZeroUsize::new(10).unwrap(),
+                run_read_size: NonZeroUsize::new(2).unwrap(),
                 temp_file_folder: PathBuf::from("/tmp"),
             })
             .unwrap();

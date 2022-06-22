@@ -11,6 +11,7 @@ pub mod result_iter;
 
 pub struct ExtsortConfig {
     pub sort_buffer_size: NonZeroUsize,
+    pub run_read_size: NonZeroUsize,
     pub temp_file_folder: PathBuf,
 }
 
@@ -56,7 +57,7 @@ impl ExtSorter {
                 file_runs.push(FileRun::new(
                     &mut sort_buffer,
                     &sort_folder,
-                    self.config.sort_buffer_size,
+                    self.config.run_read_size,
                 )?);
             }
         }
