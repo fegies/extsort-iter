@@ -27,8 +27,8 @@ jobs:
     steps:
       - name: install nightly
         run: rustup install nightly && rustup default nightly
-      - uses: actions/checkout@v3
       - name: install miri
-        run: cargo install miri
+        run: rustup component add miri
+      - uses: actions/checkout@v3
       - name: run test
         run: cargo miri test --all-features
