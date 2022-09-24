@@ -26,17 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: install nightly
-        run: rustup install nightly
+        run: rustup install nightly && rustup default nightly
       - uses: actions/checkout@v3
-      - name: install-miri
-        uses: actions-rs/cargo@v1.0.1
-        with:
-          command: install
-          toolchain: nightly
-          args: miri
-      - name: run-test
-        uses: actions-rs/cargo@v1.0.1
-        with:
-          command: miri
-          toolchain: nightly
-          args: test --all-features
+      - name: install miri
+        run: cargo install miri
+      - name: run test
+        run: cargo miri test --all-features
