@@ -3,7 +3,8 @@
 //! This crate implements an external sort for arbitrary
 //! iterators of any size, assuming they fit on disk.
 //! ```
-//! # pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # #[cfg(not(miri))]
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! use extsort_iter::*;
 //!
 //! let sequence = [3,21,42,9,5];
@@ -22,6 +23,8 @@
 //! assert_eq!(&data, &[3,5,9,21,42]);
 //! # Ok(())
 //! # }
+//! # #[cfg(miri)]
+//! # fn main() {}
 //! ```
 //!
 //! ## When not to use this crate
