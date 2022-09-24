@@ -1,4 +1,4 @@
-# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE)
+# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/fegies/extsort-iter/Rust)
 
 ### Sort iterators of any type as long as they fit on your disk!
 
