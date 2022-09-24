@@ -6,6 +6,12 @@ use crate::{
 };
 
 pub trait ExtSortOrdExtension<'a>: Iterator {
+    /// Sorts the provided Iterator according to the provided config
+    /// using the native ordering on the type to sort
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn external_sort(
         self,
         options: ExtsortConfig,
@@ -13,7 +19,7 @@ pub trait ExtSortOrdExtension<'a>: Iterator {
 }
 
 fn buffer_sort<T>(orderer: &impl Orderer<T>, buffer: &mut [T]) {
-    buffer.sort_unstable_by(|a, b| orderer.compare(a, b))
+    buffer.sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
 impl<'a, I, T> ExtSortOrdExtension<'a> for I
@@ -30,6 +36,12 @@ where
 }
 
 pub trait ExtSortByExtension<'a>: Iterator {
+    /// Sorts the provided Iterator according to the provided config
+    /// using a custom comparator function
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn external_sort_by<F>(
         self,
         options: ExtsortConfig,
@@ -38,6 +50,12 @@ pub trait ExtSortByExtension<'a>: Iterator {
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering;
 
+    /// Sorts the provided Iterator according to the provided config
+    /// using a key extraction function.
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn external_sort_by_key<F, K>(
         self,
         options: ExtsortConfig,

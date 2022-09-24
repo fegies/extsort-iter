@@ -7,6 +7,8 @@ use crate::{
     sorter::{self, result_iter::ResultIterator, ExtsortConfig},
 };
 
+/// The specific iterator type returned by
+/// the parallel sorting implementations.
 pub struct ParallelResultIterator<'a, T, O> {
     inner: ResultIterator<'a, T, O>,
 }
@@ -32,13 +34,19 @@ where
     T: Send,
     O: Orderer<T> + Sync,
 {
-    buffer.par_sort_unstable_by(|a, b| orderer.compare(a, b))
+    buffer.par_sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
 pub trait ParallelExtSortOrdExtension<'a>: Iterator
 where
     Self::Item: Send,
 {
+    /// Sorts the provided Iterator according to the provided config
+    /// the native ordering specified on the iterated type.
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn par_external_sort(
         self,
         options: ExtsortConfig,
@@ -49,6 +57,12 @@ pub trait ParallelExtSortExtension<'a>: Iterator
 where
     Self::Item: Send,
 {
+    /// Sorts the provided Iterator according to the provided config
+    /// using a custom comparison function.
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn par_external_sort_by<F>(
         self,
         options: ExtsortConfig,
@@ -57,6 +71,12 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering + Send + Sync;
 
+    /// Sorts the provided Iterator according to the provided config
+    /// using a key extraction function.
+    /// # Errors
+    /// This function may error if a sort file fails to be written.
+    /// In this case the library will do its best to clean up the
+    /// already written files, but no guarantee is made.
     fn par_external_sort_by_key<F, K>(
         self,
         options: ExtsortConfig,

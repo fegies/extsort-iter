@@ -9,16 +9,20 @@ use self::result_iter::ResultIterator;
 
 pub mod result_iter;
 
+/// The configuration for the external sorting.
+#[derive(Clone)]
 pub struct ExtsortConfig {
-    pub sort_buffer_size: NonZeroUsize,
-    pub run_read_size: NonZeroUsize,
+    /// the maximum size of the sort buffer
+    pub(crate) sort_buffer_size: NonZeroUsize,
+    pub(crate) run_read_size: NonZeroUsize,
     pub temp_file_folder: PathBuf,
 }
 
 impl ExtsortConfig {
-    pub fn default_for<T>() -> Self {
+    /// Creates a configuration with a specified sort buffer size in bytes
+    /// and a sort directory of /tmp
+    pub fn create_with_buffer_size_for<T>(sort_buf_bytes: usize) -> Self {
         let t_size = std::mem::size_of::<T>();
-        let sort_buf_bytes = 1_000_000;
 
         let one = NonZeroUsize::new(1).unwrap();
         let sort_count;
@@ -37,6 +41,13 @@ impl ExtsortConfig {
             temp_file_folder: PathBuf::from("/tmp"),
         }
     }
+    /// Creates a configuration with a sort buffer size of 10M
+    /// and a sort directory of /tmp
+    pub fn default_for<T>() -> Self {
+        Self::create_with_buffer_size_for::<T>(10_000_000)
+    }
+    /// Updates the temp_file_folder attribute.
+    /// Useful for fluent-style api usage.
     pub fn temp_file_folder(self, folder: impl Into<PathBuf>) -> Self {
         Self {
             temp_file_folder: folder.into(),
@@ -91,6 +102,10 @@ impl ExtSorter {
                 )?);
             }
         }
+
+        // now the remaining buffer should be sorted as well, to allow
+        // us to treat it as a run too.
+        buffer_sort(&orderer, &mut sort_buffer);
 
         let runs = file_runs
             .into_iter()

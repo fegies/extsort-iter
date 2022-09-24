@@ -1,13 +1,55 @@
 // struct SequentialSorter {}
 
+//! This crate implements an external sort for arbitrary
+//! iterators of any size, assuming they fit on disk.
+//! ```
+//! # pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! use extsort_iter::*;
+//!
+//! let sequence = [3,21,42,9,5];
+//!
+//! // the default configuration will sort with up to 10M in buffered in Memory
+//! // and place the files under /tmp
+//! //
+//! // you will most likely want to change at least the location.
+//! let config = ExtsortConfig::default_for::<i32>();
+//!
+//! let data = sequence
+//!     .iter()
+//!     .cloned()
+//!     .external_sort(config)?
+//!     .collect::<Vec<_>>();
+//! assert_eq!(&data, &[3,5,9,21,42]);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## When not to use this crate
+//!
+//! When your source iterator is big because each item owns large amounts of heap memory.
+//! That means the following case will result in memory exhaustion:
+//! ```no_run
+//! # use extsort_iter::*;
+//! let data = "somestring".to_owned();
+//! let iterator = std::iter::from_fn(|| Some(data.clone())).take(1_000_000);
+//! let sorted  = iterator.external_sort(ExtsortConfig::default_for::<String>());
+//! ```
+//!
+//! The reason for that is that we are not dropping the values from the source iterator until they are
+//! yielded by the result iterator.
+//!
+//! You can think of it as buffering the entire input iterator, with the values
+//! themselves living on disk but all memory the values point to still living on the heap.
+
+#[warn(clippy::all, clippy::pedantic)]
+#[allow(clippy::module_name_repetitions)]
 pub mod extension_trait;
 mod orderer;
 mod run;
 mod sorter;
 
 pub use extension_trait::*;
-
-/// This crate
+pub use sorter::ExtsortConfig;
 
 #[cfg(not(miri))]
 #[cfg(test)]

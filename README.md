@@ -6,7 +6,7 @@
 sort any iterator with no serialization steps required.
 
 Conceptually, we are taking your input iterator, buffering it, sorting the runs,
-moving the data to disk before streaming it back in in order.
+moving the data to disk before streaming it back in order.
 
 ## Why this crate?
 
@@ -65,7 +65,7 @@ When your source iterator is big because each item owns large amounts of heap me
 That means the following case will result in memory exhaustion:
 ```rust
 let data = "somestring".to_owned();
-let iterator = std::iter::from_fn(|| data.clone()).take(1_000_000);
+let iterator = std::iter::from_fn(|| Some(data.clone())).take(1_000_000);
 let sorted  = iterator.external_sort(ExtsortConfig::default_for::<String>());
 ```
 
