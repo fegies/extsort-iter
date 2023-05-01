@@ -1,18 +1,12 @@
 use std::{
-    fs::{self, File},
-    io::{self, ErrorKind, Read, Seek, Write},
+    io::{self, ErrorKind, Read},
     mem::{self, MaybeUninit},
     num::NonZeroUsize,
-    path::Path,
 };
 
-use super::Run;
+use crate::tape::Tape;
 
-/// Our ExternalRun specialised to the File backing type.
-/// This is the only type that will be used outside of this module,
-/// we mainly keep the type parameter in order to be able to
-/// run our tests under miri
-pub type FileRun<T> = ExternalRun<T, File>;
+use super::Run;
 
 /// A run backed by a file on disk.
 /// The file is deleted when the run is dropped.
@@ -53,9 +47,10 @@ where
 /// Fills the provided file with the values drained from source.
 /// When the call completes successfully, source will be empty.
 /// If it fails, source will remain untouched.
+#[cfg(test)]
 fn fill_backing<T, TBacking>(source: &mut Vec<T>, file: &mut TBacking) -> io::Result<()>
 where
-    TBacking: Write + Seek,
+    TBacking: std::io::Write + std::io::Seek,
 {
     // we create a byteslice view into the vec
     // SAFETY:
@@ -86,43 +81,29 @@ where
     Ok(())
 }
 
-/// Creates the file that we want to use for the run later.
-fn create_file(filename: &Path) -> io::Result<File> {
-    let file = fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .read(true)
-        .open(filename)?;
+/// Creates a new FileRun Object that uses the provided source as its
+/// buffer, but is not actually backed by anything on disk
+pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read>> {
+    let buffer: Vec<MaybeUninit<T>> = unsafe {
+        // we are only transmuting our Vec<T> to Vec<MaybeUninit<T>>.
+        // this is guaranteed to have the same binary representation.
+        core::mem::transmute(source)
+    };
 
-    // we immediately delete the file, but keep the handle open
-    // this has 2 advantages:
-    // - we make it much harder to modify the file outside our program
-    //   because it is no longer accessible from the file system (just /proc)
-    // - it will automatically be cleaned up for us when the handle is dropped (or when the program exits)
-    //   eliminating the need for custom cleanup code in our program.
-    fs::remove_file(filename)?;
+    let remaining_entries = buffer.len();
 
-    Ok(file)
-}
-
-impl<T> FileRun<T> {
-    /// Creates a new FileRun Object filled with the contents from the provided vector.
-    /// Might fail if there is not enough space available for the new file or the file already exists.
-    /// When this call returns successfully, source will be empty.
-    /// if it fails, source will remain untouched.
-    pub fn new(
-        source: &mut Vec<T>,
-        filename: &Path,
-        buffer_size: NonZeroUsize,
-    ) -> io::Result<Self> {
-        let file = create_file(filename)?;
-        Self::from_backing(source, file, buffer_size)
+    ExternalRun {
+        source: Box::new(io::Cursor::new(&[])),
+        buffer,
+        read_idx: 0,
+        remaining_entries,
     }
 }
 
+#[cfg(test)]
 impl<T, TBacking> ExternalRun<T, TBacking>
 where
-    TBacking: Read + Write + Seek,
+    TBacking: Read + std::io::Write + std::io::Seek,
 {
     /// Creates a new ExternalRun Object filled with the contents from the provided vector.
     /// Might fail if there is not enough space available on disk
@@ -163,6 +144,24 @@ impl<T, TBacking> ExternalRun<T, TBacking>
 where
     TBacking: Read,
 {
+    pub fn from_tape(tape: Tape<TBacking>, buffer_size: NonZeroUsize) -> Self {
+        let num_entries = tape.num_entries();
+        let source = tape.into_backing();
+        let mut buffer = Vec::with_capacity(buffer_size.into());
+        for _ in 0..buffer_size.into() {
+            buffer.push(MaybeUninit::uninit());
+        }
+        let mut res = Self {
+            buffer,
+            read_idx: 0,
+            remaining_entries: num_entries,
+            source,
+        };
+
+        res.refill_buffer();
+
+        res
+    }
     /// refills the read buffer.
     /// this should only be called if the read_idx is at the end of the buffer
     ///
@@ -271,7 +270,7 @@ where
         Some(result)
     }
 
-    fn size_hint(&self) -> usize {
+    fn remaining_items(&self) -> usize {
         self.remaining_entries
     }
 }
@@ -291,7 +290,7 @@ mod test {
             ExternalRun::from_backing(&mut data.clone(), Cursor::new(Vec::new()), buffer_size)
                 .unwrap();
 
-        assert_eq!(data.len(), run.size_hint());
+        assert_eq!(data.len(), run.remaining_items());
         let collected = std::iter::from_fn(|| run.next()).collect::<Vec<_>>();
         assert_eq!(data, collected);
     }

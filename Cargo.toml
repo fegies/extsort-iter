@@ -19,6 +19,9 @@ parallel_sort = ["rayon"]
 [dependencies]
 rayon = {version = "1", optional = true}
 
+[dev-dependencies]
+rand = "0.8.5"
+num_cpus = "1"
 
 [package.metadata.docs.rs]
 all-features = true

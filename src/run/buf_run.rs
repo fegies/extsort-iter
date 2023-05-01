@@ -3,7 +3,7 @@ use std::vec::IntoIter;
 use super::Run;
 
 /// A run backed by the provided buffer.
-pub struct BufRun<T> {
+pub(crate) struct BufRun<T> {
     source: IntoIter<T>,
 }
 
@@ -25,7 +25,7 @@ impl<T> Run<T> for BufRun<T> {
         self.source.next()
     }
 
-    fn size_hint(&self) -> usize {
+    fn remaining_items(&self) -> usize {
         self.source.len()
     }
 }

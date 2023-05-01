@@ -1,11 +1,15 @@
-use std::{cmp::Ordering, io};
+use std::{
+    cmp::Ordering,
+    io::{self, Read},
+};
 
 use crate::{
     orderer::{FuncOrderer, KeyOrderer, OrdOrderer, Orderer},
+    run::{file_run::ExternalRun, Run},
     sorter::{self, result_iter::ResultIterator, ExtsortConfig},
 };
 
-pub trait ExtSortOrdExtension<'a>: Iterator {
+pub trait ExtSortOrdExtension: Iterator {
     /// Sorts the provided Iterator according to the provided config
     /// using the native ordering on the type to sort
     /// # Errors
@@ -15,27 +19,28 @@ pub trait ExtSortOrdExtension<'a>: Iterator {
     fn external_sort(
         self,
         options: ExtsortConfig,
-    ) -> io::Result<ResultIterator<'a, Self::Item, OrdOrderer>>;
+    ) -> io::Result<ResultIterator<Self::Item, OrdOrderer>>;
 }
 
 fn buffer_sort<T>(orderer: &impl Orderer<T>, buffer: &mut [T]) {
     buffer.sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
-impl<'a, I, T> ExtSortOrdExtension<'a> for I
+impl<I, T> ExtSortOrdExtension for I
 where
     I: Iterator<Item = T>,
-    T: Ord + 'a,
+    T: Ord,
 {
     fn external_sort(
         self,
         options: ExtsortConfig,
-    ) -> io::Result<ResultIterator<'a, Self::Item, OrdOrderer>> {
+    ) -> io::Result<ResultIterator<Self::Item, OrdOrderer>> {
         sorter::ExtSorter::new(options).run(self, OrdOrderer::new(), buffer_sort)
     }
 }
 
-pub trait ExtSortByExtension<'a>: Iterator {
+pub trait ExtSortByExtension: Iterator {
+    type Run: Run<Self::Item>;
     /// Sorts the provided Iterator according to the provided config
     /// using a custom comparator function
     /// # Errors
@@ -46,7 +51,7 @@ pub trait ExtSortByExtension<'a>: Iterator {
         self,
         options: ExtsortConfig,
         comparator: F,
-    ) -> io::Result<ResultIterator<'a, Self::Item, FuncOrderer<F>>>
+    ) -> io::Result<ResultIterator<Self::Item, FuncOrderer<F>>>
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering;
 
@@ -60,22 +65,23 @@ pub trait ExtSortByExtension<'a>: Iterator {
         self,
         options: ExtsortConfig,
         key_extractor: F,
-    ) -> io::Result<ResultIterator<'a, Self::Item, KeyOrderer<F>>>
+    ) -> io::Result<ResultIterator<Self::Item, KeyOrderer<F>>>
     where
         F: Fn(&Self::Item) -> K,
         K: Ord;
 }
 
-impl<'a, I, T> ExtSortByExtension<'a> for I
+impl<I, T> ExtSortByExtension for I
 where
     I: Iterator<Item = T>,
-    T: 'a,
 {
+    type Run = ExternalRun<T, Box<dyn Read>>;
+
     fn external_sort_by<F>(
         self,
         options: ExtsortConfig,
         comparator: F,
-    ) -> io::Result<ResultIterator<'a, Self::Item, FuncOrderer<F>>>
+    ) -> io::Result<ResultIterator<Self::Item, FuncOrderer<F>>>
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering,
     {
@@ -86,7 +92,7 @@ where
         self,
         options: ExtsortConfig,
         key_extractor: F,
-    ) -> io::Result<ResultIterator<'a, Self::Item, KeyOrderer<F>>>
+    ) -> io::Result<ResultIterator<Self::Item, KeyOrderer<F>>>
     where
         F: Fn(&Self::Item) -> K,
         K: Ord,
@@ -94,4 +100,3 @@ where
         sorter::ExtSorter::new(options).run(self, KeyOrderer::new(key_extractor), buffer_sort)
     }
 }
-// impl<'a, I, T> ExtSortByExtension

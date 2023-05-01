@@ -9,11 +9,11 @@ use crate::{
 
 /// The specific iterator type returned by
 /// the parallel sorting implementations.
-pub struct ParallelResultIterator<'a, T, O> {
-    inner: ResultIterator<'a, T, O>,
+pub struct ParallelResultIterator<T, O> {
+    inner: ResultIterator<T, O>,
 }
 
-impl<T, O> Iterator for ParallelResultIterator<'_, T, O>
+impl<T, O> Iterator for ParallelResultIterator<T, O>
 where
     O: Orderer<T>,
 {
@@ -27,7 +27,7 @@ where
         self.inner.size_hint()
     }
 }
-impl<T, O> ExactSizeIterator for ParallelResultIterator<'_, T, O> where O: Orderer<T> {}
+impl<T, O> ExactSizeIterator for ParallelResultIterator<T, O> where O: Orderer<T> {}
 
 fn buffer_sort<T, O>(orderer: &O, buffer: &mut [T])
 where
@@ -37,7 +37,7 @@ where
     buffer.par_sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
-pub trait ParallelExtSortOrdExtension<'a>: Iterator
+pub trait ParallelExtSortOrdExtension: Iterator
 where
     Self::Item: Send,
 {
@@ -50,10 +50,10 @@ where
     fn par_external_sort(
         self,
         options: ExtsortConfig,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, OrdOrderer>>;
+    ) -> io::Result<ParallelResultIterator<Self::Item, OrdOrderer>>;
 }
 
-pub trait ParallelExtSortExtension<'a>: Iterator
+pub trait ParallelExtSortExtension: Iterator
 where
     Self::Item: Send,
 {
@@ -67,7 +67,7 @@ where
         self,
         options: ExtsortConfig,
         comparator: F,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, FuncOrderer<F>>>
+    ) -> io::Result<ParallelResultIterator<Self::Item, FuncOrderer<F>>>
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering + Send + Sync;
 
@@ -81,36 +81,36 @@ where
         self,
         options: ExtsortConfig,
         key_extractor: F,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, KeyOrderer<F>>>
+    ) -> io::Result<ParallelResultIterator<Self::Item, KeyOrderer<F>>>
     where
         F: Fn(&Self::Item) -> K + Send + Sync,
         K: Ord;
 }
 
-impl<'a, I, T> ParallelExtSortOrdExtension<'a> for I
+impl<I, T> ParallelExtSortOrdExtension for I
 where
     I: Iterator<Item = T>,
-    T: Send + Ord + 'a,
+    T: Send + Ord,
 {
     fn par_external_sort(
         self,
         options: ExtsortConfig,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, OrdOrderer>> {
+    ) -> io::Result<ParallelResultIterator<Self::Item, OrdOrderer>> {
         let inner = sorter::ExtSorter::new(options).run(self, OrdOrderer::new(), buffer_sort)?;
         Ok(ParallelResultIterator { inner })
     }
 }
 
-impl<'a, I, T> ParallelExtSortExtension<'a> for I
+impl<I, T> ParallelExtSortExtension for I
 where
     I: Iterator<Item = T>,
-    T: Send + 'a,
+    T: Send,
 {
     fn par_external_sort_by<F>(
         self,
         options: ExtsortConfig,
         comparator: F,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, FuncOrderer<F>>>
+    ) -> io::Result<ParallelResultIterator<Self::Item, FuncOrderer<F>>>
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering + Send + Sync,
     {
@@ -123,7 +123,7 @@ where
         self,
         options: ExtsortConfig,
         key_extractor: F,
-    ) -> io::Result<ParallelResultIterator<'a, Self::Item, KeyOrderer<F>>>
+    ) -> io::Result<ParallelResultIterator<Self::Item, KeyOrderer<F>>>
     where
         F: Fn(&Self::Item) -> K + Send + Sync,
         K: Ord,

@@ -44,12 +44,17 @@
 //! You can think of it as buffering the entire input iterator, with the values
 //! themselves living on disk but all memory the values point to still living on the heap.
 
+#[cfg(windows)]
+extern crate winapi;
+
 #[warn(clippy::all, clippy::pedantic)]
 #[allow(clippy::module_name_repetitions)]
 pub mod extension_trait;
+mod merge;
 mod orderer;
 mod run;
 mod sorter;
+mod tape;
 
 pub use extension_trait::*;
 pub use sorter::ExtsortConfig;
@@ -57,8 +62,6 @@ pub use sorter::ExtsortConfig;
 #[cfg(not(miri))]
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZeroUsize, path::PathBuf};
-
     use crate::{extension_trait::ExtSortOrdExtension, sorter::ExtsortConfig};
 
     #[test]
@@ -73,14 +76,10 @@ mod tests {
 
         let data = sequence
             .iter()
-            .external_sort(ExtsortConfig {
-                sort_buffer_size: NonZeroUsize::new(10).unwrap(),
-                run_read_size: NonZeroUsize::new(2).unwrap(),
-                temp_file_folder: PathBuf::from("/tmp"),
-            })
+            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(32))
             .unwrap();
 
-        let is_sorted = data.zip(1..).all(|(l, r)| *l == r);
+        let is_sorted = data.into_iter().zip(1..).all(|(l, r)| *l == r);
 
         assert!(is_sorted);
     }

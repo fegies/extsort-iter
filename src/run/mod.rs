@@ -1,5 +1,7 @@
-pub mod buf_run;
+#[cfg(test)]
+pub(crate) mod buf_run;
 pub mod file_run;
+pub mod split_backing;
 
 /// A run is a sequence of items in ascending order.
 pub trait Run<T> {
@@ -12,5 +14,5 @@ pub trait Run<T> {
 
     /// returns the bounds on the remaining length of the run
     /// See https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.size_hint
-    fn size_hint(&self) -> usize;
+    fn remaining_items(&self) -> usize;
 }

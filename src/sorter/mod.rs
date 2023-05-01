@@ -1,9 +1,6 @@
-use std::{io, num::NonZeroUsize, path::PathBuf, process};
+use std::{io, num::NonZeroUsize, path::PathBuf};
 
-use crate::{
-    orderer::Orderer,
-    run::{buf_run::BufRun, file_run::FileRun, Run},
-};
+use crate::{orderer::Orderer, run::file_run::create_buffer_run, tape::TapeCollection};
 
 use self::result_iter::ResultIterator;
 
@@ -14,6 +11,7 @@ pub mod result_iter;
 pub struct ExtsortConfig {
     /// the maximum size of the sort buffer
     pub(crate) sort_buffer_size: NonZeroUsize,
+    /// the number of bytes to read ahead
     pub(crate) run_read_size: NonZeroUsize,
     pub temp_file_folder: PathBuf,
 }
@@ -67,53 +65,59 @@ impl ExtSorter {
 
     pub fn run<'a, S, T, O, F>(
         &self,
-        source: S,
+        mut source: S,
         orderer: O,
         mut buffer_sort: F,
-    ) -> io::Result<ResultIterator<'a, T, O>>
+    ) -> io::Result<ResultIterator<T, O>>
     where
         S: Iterator<Item = T>,
         O: Orderer<T>,
         T: 'a,
         F: FnMut(&O, &mut [T]),
     {
-        let pid = process::id();
-        let self_addr = self as *const Self as usize;
-
         let max_buffer_size = self.config.sort_buffer_size.into();
         let mut sort_buffer = Vec::with_capacity(max_buffer_size);
-        let mut sort_folder = self.config.temp_file_folder.clone();
-        sort_folder.push("dummy");
-        let mut file_runs = Vec::new();
-        for item in source {
-            sort_buffer.push(item);
-            if sort_buffer.len() == max_buffer_size {
-                buffer_sort(&orderer, &mut sort_buffer);
-                sort_folder.set_file_name(format!(
-                    "{}_{}_sort_file_{}",
-                    pid,
-                    self_addr,
-                    file_runs.len()
-                ));
-                file_runs.push(FileRun::new(
-                    &mut sort_buffer,
-                    &sort_folder,
-                    self.config.run_read_size,
-                )?);
+
+        let mut tape_collection = TapeCollection::<T>::new(
+            self.config.temp_file_folder.clone(),
+            NonZeroUsize::new(256).unwrap(),
+        );
+
+        let source = &mut source;
+        loop {
+            sort_buffer.extend(source.take(max_buffer_size));
+            buffer_sort(&orderer, &mut sort_buffer);
+            if sort_buffer.len() < max_buffer_size {
+                // we could not completely fill the buffer, so we know that this
+                // is the last run that will be generated.
+
+                if tape_collection.is_empty() {
+                    // we did not acually move anything to disk.
+                    // in this case we can just reuse the sort buffer
+                    // as a sort of pseudo tape.
+                    let buffer_run = create_buffer_run(sort_buffer);
+                    return Ok(ResultIterator::new(vec![buffer_run], orderer));
+                } else {
+                    // since we moved runs to disk, we will need to use memory for the read buffers.
+                    // to avoid going over budget, we move the final run to disk as well
+                    tape_collection.add_run(&mut sort_buffer)?;
+                }
+                break;
+            } else {
+                tape_collection.add_run(&mut sort_buffer)?;
             }
         }
 
-        // now the remaining buffer should be sorted as well, to allow
-        // us to treat it as a run too.
-        buffer_sort(&orderer, &mut sort_buffer);
+        // at this point, we must have moved runs to disk, including the final sort buffer.
+        debug_assert!(sort_buffer.is_empty());
+        // it should not be necessary to manually drop the buffer here, but it sure does
+        // not hurt and this way we are guaranteed to have released the memory
+        // before initializing the tapes, even on compiler versions that do not
+        // implement NLL yet.
+        drop(sort_buffer);
 
-        let runs = file_runs
-            .into_iter()
-            .map(|a| Box::new(a) as Box<dyn Run<T> + '_>)
-            .chain(Some(
-                Box::new(BufRun::new(sort_buffer)) as Box<dyn Run<T> + '_>
-            ));
+        let tapes = tape_collection.into_tapes(self.config.run_read_size);
 
-        Ok(ResultIterator::new(runs, orderer))
+        Ok(ResultIterator::new(tapes, orderer))
     }
 }

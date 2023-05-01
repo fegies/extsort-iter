@@ -9,9 +9,9 @@ let
     # targets = [ "riscv64gc-unknown-none-elf" "x86_64-unknown-linux-gnu" ];
   };
   nightlyToolchain = toolchain: toolchain.default.override overrideSet;
-  nightlyRust = with pkgs; rust-bin.selectLatestNightlyWith toolchain;
+  nightlyRust = with pkgs; rust-bin.selectLatestNightlyWith nightlyToolchain;
   stableRust = pkgs.rust-bin.stable.latest.default.override overrideSet;
 
-  useMiri = false;
+  useMiri = true;
 in
 if useMiri then nightlyRust else stableRust
