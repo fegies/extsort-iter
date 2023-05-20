@@ -1,4 +1,4 @@
-# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE) [![Rust](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml) [![docs.rs](https://img.shields.io/docsrs/extsort-iter)](https://docs.rs/extsort-iter)
+# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE) [![Rust](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml) [![docs.rs](https://img.shields.io/docsrs/extsort-iter)](https://docs.rs/extsort-iter) ![Crates.io](https://img.shields.io/crates/v/extsort-iter)
 
 ### Sort iterators of any type as long as they fit on your disk!
 
@@ -39,6 +39,12 @@ let iterator = data.external_sort_by(config, |a,b| if a == 42 {
 // or you can provide a key extraction function to sort by
 // (here we are sorting by the number of trailing ones)
 let iterator = data.external_sort_by_key(config, |a| a.trailing_ones());
+
+// if you can spare the memory, you should increase the size of the in-memory sort buffer.
+// it defaults to 10MB.
+// larger buffer sizes will drastically improve your sort performance, because only the
+// in-memory sort part is parallelized and the IO becomes more sequential
+let config = ExtsortConfig::create_with_buffer_size_for::<usize>(1_073_741_824);
 ```
 
 If you enable the `parallel_sort` feature, parallel versions of all sort function
