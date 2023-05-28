@@ -1,6 +1,6 @@
 [package]
 name = "extsort-iter"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Felix Giese <felix.giese@icloud.com>"]
 description = "external sorting for all types for all iterators"
