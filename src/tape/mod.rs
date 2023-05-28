@@ -24,7 +24,8 @@ impl<T> TapeCollection<T> {
     pub fn into_tapes(self, read_buffer_size: NonZeroUsize) -> Vec<ExternalRun<T, Box<dyn Read>>> {
         let num_tapes = self.plain_tapes.len() + self.shared_tapes.len();
         let read_buffer_items = usize::from(read_buffer_size) / num_tapes;
-        let read_buffer_items = NonZeroUsize::new(read_buffer_items).unwrap_or(NonZeroUsize::MIN);
+        let one = NonZeroUsize::new(1).unwrap();
+        let read_buffer_items = NonZeroUsize::new(read_buffer_items).unwrap_or(one);
 
         self.plain_tapes
             .into_iter()

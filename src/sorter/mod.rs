@@ -20,12 +20,11 @@ impl ExtsortConfig {
         let t_size = std::mem::size_of::<T>();
 
         let one = NonZeroUsize::new(1).unwrap();
-        let sort_count;
-        if t_size == 0 {
-            sort_count = one;
+        let sort_count = if t_size == 0 {
+            one
         } else {
-            sort_count = NonZeroUsize::new(sort_buf_bytes / t_size).unwrap_or(one);
-        }
+            NonZeroUsize::new(sort_buf_bytes / t_size).unwrap_or(one)
+        };
 
         ExtsortConfig {
             sort_buffer_size: sort_count,

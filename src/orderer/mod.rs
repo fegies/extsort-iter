@@ -10,10 +10,11 @@ pub trait Orderer<T> {
 }
 
 /// An orderer that just delegates to the Ord implementation on the type itself
+#[derive(Default)]
 pub struct OrdOrderer {}
 impl OrdOrderer {
     pub fn new() -> Self {
-        Self {}
+        Default::default()
     }
 }
 
