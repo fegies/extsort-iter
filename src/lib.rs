@@ -83,4 +83,35 @@ mod tests {
 
         assert!(is_sorted);
     }
+
+    fn roundtrip_sequence(sequence: Vec<i32>, buffer_size: usize) {
+        let roundtripped = sequence
+            .iter()
+            .cloned()
+            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(
+                buffer_size,
+            ))
+            .unwrap()
+            .collect::<Vec<_>>();
+
+        assert_eq!(sequence, roundtripped);
+    }
+
+    #[test]
+    fn test_single_run() {
+        let sequence = (1..100).collect();
+        roundtrip_sequence(sequence, 80000);
+    }
+
+    #[test]
+    fn test_many_runs() {
+        let sequence = (0..1000).collect();
+        roundtrip_sequence(sequence, 16);
+    }
+
+    #[test]
+    fn test_tiny_buffer() {
+        let sequence = (0..1000).collect();
+        roundtrip_sequence(sequence, 1);
+    }
 }

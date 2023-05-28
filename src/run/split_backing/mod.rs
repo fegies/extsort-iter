@@ -4,49 +4,12 @@ use std::{
     rc::Rc,
 };
 
-/// A wrapper around a seekable file.
-struct BackingWrapper<T> {
-    /// the wrapped file
-    inner: T,
-    /// Determins if we can rely on the cached seek position.
-    tainted: bool,
-    /// the currently active seek index.
-    current_seek_index: u64,
-}
+use self::backing_wrapper::BackingWrapper;
 
-impl<T> BackingWrapper<T>
-where
-    T: Seek + Read,
-{
-    /// reads from the specfied position in the file
-    fn read(&mut self, start_offset: u64, buffer: &mut [u8]) -> io::Result<usize> {
-        if self.tainted || self.current_seek_index != start_offset {
-            self.inner.seek(SeekFrom::Start(start_offset))?;
-            self.current_seek_index = start_offset;
-            self.tainted = false;
-        }
-
-        let res = self.inner.read(buffer);
-        match &res {
-            Ok(bytes_read) => self.current_seek_index += *bytes_read as u64,
-            Err(_) => {
-                self.tainted = true;
-            }
-        }
-        res
-    }
-
-    fn new(inner: T) -> Self {
-        Self {
-            inner,
-            current_seek_index: 0,
-            tainted: true,
-        }
-    }
-}
+mod backing_wrapper;
 
 pub struct SplitView<T> {
-    backing: Rc<RefCell<BackingWrapper<T>>>,
+    backing: Rc<RefCell<backing_wrapper::BackingWrapper<T>>>,
     // a past-the-end index of the current segment in the file
     segment_end: u64,
     // the current read position inside this segment
@@ -65,7 +28,7 @@ where
         })
     }
     pub fn add_segment(&mut self) -> io::Result<SplitViewWrite<T>> {
-        let segment_start = self.backing.borrow_mut().inner.seek(SeekFrom::End(0))? + 1;
+        let segment_start = self.backing.borrow_mut().seek(SeekFrom::End(0))?;
         Ok(SplitViewWrite {
             backing: self.backing.clone(),
             length: 0,
@@ -90,15 +53,21 @@ impl<T> From<SplitViewWrite<T>> for SplitView<T> {
     }
 }
 
-impl<T: Write> Write for SplitViewWrite<T> {
+impl<T> Write for SplitViewWrite<T>
+where
+    T: Write + Seek,
+{
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let bytes_written = self.backing.borrow_mut().inner.write(buf)?;
+        let bytes_written = self
+            .backing
+            .borrow_mut()
+            .write_at(self.segment_start + self.length, buf)?;
         self.length += bytes_written as u64;
         Ok(bytes_written)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.backing.borrow_mut().inner.flush()
+        self.backing.borrow_mut().flush()
     }
 }
 

@@ -22,6 +22,7 @@ pub struct LoserTree<T, R, O> {
     remaining_tapes: usize,
 }
 
+/// returns the largest power of 2 less or equal to the provided number
 fn previous_power_of_two(number: usize) -> usize {
     let leading_zeros = number.leading_zeros();
     const SHIFT_TO_HIGHEST_BIT: usize = core::mem::size_of::<usize>() * 8 - 1;
@@ -55,9 +56,10 @@ where
     /// Constructs a new loser tree from the given tapes
     /// and a provided ordering instruction.
     pub fn new(tapes: Vec<R>, orderer: O) -> Self {
+        let remaining_tapes = tapes.len();
         let mut result = Self {
             loser_indices: Vec::new(),
-            remaining_tapes: tapes.len(),
+            remaining_tapes,
             tapes,
             orderer,
             winner: Winner { idx: u32::MAX },

@@ -44,43 +44,6 @@ where
     }
 }
 
-/// Fills the provided file with the values drained from source.
-/// When the call completes successfully, source will be empty.
-/// If it fails, source will remain untouched.
-#[cfg(test)]
-fn fill_backing<T, TBacking>(source: &mut Vec<T>, file: &mut TBacking) -> io::Result<()>
-where
-    TBacking: std::io::Write + std::io::Seek,
-{
-    // we create a byteslice view into the vec
-    // SAFETY:
-    // this is safe because the alignment restrictions of the byteslice are loose enough to allow this
-    // and because if T is zero-sized, we will create an empty slice over T.
-    let slice = unsafe {
-        let num_bytes = source.len() * std::mem::size_of::<T>();
-        std::slice::from_raw_parts(source.as_ptr() as *const u8, num_bytes)
-    };
-
-    // move the contents of the vec to the file.
-    file.write_all(slice)?;
-
-    // seek to the beginning of the file to ensure that we will actually read its contents
-    file.seek(io::SeekFrom::Start(0))?;
-
-    // we have conceptually moved all the data that our vec used to contain to disk.
-    // in order to make sure that the drop functions are not called twice,
-    // we will leak the content of the vec (this is conceptually the same calling mem::forget)
-    // on every item in the vec.
-    // SAFETY:
-    // this is safe because the vec is now empty after this and we no longer refer to
-    // any of the elements inside.
-    unsafe {
-        source.set_len(0);
-    }
-
-    Ok(())
-}
-
 /// Creates a new FileRun Object that uses the provided source as its
 /// buffer, but is not actually backed by anything on disk
 pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read>> {
@@ -100,46 +63,6 @@ pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read>> {
     }
 }
 
-#[cfg(test)]
-impl<T, TBacking> ExternalRun<T, TBacking>
-where
-    TBacking: Read + std::io::Write + std::io::Seek,
-{
-    /// Creates a new ExternalRun Object filled with the contents from the provided vector.
-    /// Might fail if there is not enough space available on disk
-    /// When this call returns successfully, source will be empty.
-    /// if it fails, source will remain untouched.
-    fn from_backing(
-        source: &mut Vec<T>,
-        mut backing: TBacking,
-        buffer_size: NonZeroUsize,
-    ) -> io::Result<Self> {
-        let remaining_entries = source.len();
-        // let backing = create_file(filename)?;
-        fill_backing(source, &mut backing)?;
-        let source = backing;
-
-        let mut buffer = Vec::with_capacity(buffer_size.into());
-        for _ in 0..buffer_size.into() {
-            buffer.push(MaybeUninit::zeroed());
-        }
-
-        let mut res = Self {
-            source,
-            read_idx: buffer.len(),
-            buffer,
-            remaining_entries,
-        };
-        // in order for the peek calls to not have to take a mutable reference
-        // we further maintain the invariant that the read_idx only reaches
-        // the buffer end when the source is actually empty,
-        // so we need to refill it once now.
-        res.refill_buffer();
-
-        Ok(res)
-    }
-}
-
 impl<T, TBacking> ExternalRun<T, TBacking>
 where
     TBacking: Read,
@@ -147,6 +70,7 @@ where
     pub fn from_tape(tape: Tape<TBacking>, buffer_size: NonZeroUsize) -> Self {
         let num_entries = tape.num_entries();
         let source = tape.into_backing();
+
         let mut buffer = Vec::with_capacity(buffer_size.into());
         for _ in 0..buffer_size.into() {
             buffer.push(MaybeUninit::uninit());
@@ -278,7 +202,8 @@ where
 #[cfg(test)]
 mod test {
     use std::fmt::Debug;
-    use std::io::Cursor;
+
+    use crate::tape::vec_to_tape;
 
     use super::*;
 
@@ -286,9 +211,8 @@ mod test {
     where
         T: Clone + Eq + Debug,
     {
-        let mut run =
-            ExternalRun::from_backing(&mut data.clone(), Cursor::new(Vec::new()), buffer_size)
-                .unwrap();
+        let tape = vec_to_tape(data.clone());
+        let mut run = ExternalRun::from_tape(tape, buffer_size);
 
         assert_eq!(data.len(), run.remaining_items());
         let collected = std::iter::from_fn(|| run.next()).collect::<Vec<_>>();

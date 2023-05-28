@@ -12,6 +12,9 @@ pub(super) struct LoserTreeBuilder<'a, C> {
     loser_tree: &'a mut Vec<u32>,
 }
 
+/// split a range at the specified point
+/// the split point shall denote the size of the left
+/// range piece after the split.
 fn split_range(range: Range<u32>, split_point: usize) -> (Range<u32>, Range<u32>) {
     let midpoint = range.start + split_point as u32;
     let mut left = range.clone();
@@ -33,11 +36,10 @@ where
     }
 
     pub(super) fn build(mut self, number_of_tapes: usize) -> Winner {
-        self.loser_tree.clear();
         let num_internal_nodes = number_of_tapes - 1;
-        self.loser_tree.reserve(num_internal_nodes);
-        self.loser_tree
-            .extend(std::iter::repeat(0).take(num_internal_nodes));
+        if self.loser_tree.len() < num_internal_nodes {
+            *self.loser_tree = vec![0; num_internal_nodes];
+        }
         self.build_tree_complete(0..number_of_tapes as u32, TreeNode::root())
     }
 

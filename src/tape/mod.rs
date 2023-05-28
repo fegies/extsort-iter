@@ -22,18 +22,16 @@ pub struct TapeCollection<T> {
 
 impl<T> TapeCollection<T> {
     pub fn into_tapes(self, read_buffer_size: NonZeroUsize) -> Vec<ExternalRun<T, Box<dyn Read>>> {
-        let mut res = Vec::with_capacity(self.plain_tapes.len() + self.shared_tapes.len() + 1);
-        let iter = self
-            .plain_tapes
+        let num_tapes = self.plain_tapes.len() + self.shared_tapes.len();
+        let read_buffer_items = usize::from(read_buffer_size) / num_tapes;
+        let read_buffer_items = NonZeroUsize::new(read_buffer_items).unwrap_or(NonZeroUsize::MIN);
+
+        self.plain_tapes
             .into_iter()
-            .map(|t| ExternalRun::from_tape(t.box_backing(), read_buffer_size))
-            .chain(
-                self.shared_tapes
-                    .into_iter()
-                    .map(|t| ExternalRun::from_tape(t.box_backing(), read_buffer_size)),
-            );
-        res.extend(iter);
-        res
+            .map(|t| t.box_backing())
+            .chain(self.shared_tapes.into_iter().map(|t| t.box_backing()))
+            .map(|t| ExternalRun::from_tape(t, read_buffer_items))
+            .collect()
     }
     pub fn new(sort_folder: PathBuf, max_files: NonZeroUsize) -> Self {
         let mut next_file_name = sort_folder;
@@ -48,26 +46,26 @@ impl<T> TapeCollection<T> {
         }
     }
     pub fn add_run(&mut self, source: &mut Vec<T>) -> io::Result<()> {
-        if self.next_tape_idx >= self.max_files {
-            self.add_run_shared(source)?;
-        } else {
+        if self.next_tape_idx < self.max_files {
             self.add_run_simple(source)?;
+        } else {
+            self.add_run_shared(source)?;
         }
         self.next_tape_idx += 1;
         Ok(())
     }
     fn add_run_shared(&mut self, source: &mut Vec<T>) -> io::Result<()> {
-        let mut new_backing = if let Some(tape) = self.plain_tapes.pop() {
-            let mut shared_tape = Tape {
+        let selected_tape_idx = if let Some(tape) = self.plain_tapes.pop() {
+            let shared_tape = Tape {
                 backing: SplitView::new(tape.backing)?,
                 num_entries: tape.num_entries,
             };
-            shared_tape.backing.add_segment()?
+            self.shared_tapes.push(shared_tape);
+            self.shared_tapes.len() - 1
         } else {
-            self.shared_tapes[self.next_tape_idx % self.max_files]
-                .backing
-                .add_segment()?
+            self.next_tape_idx % self.max_files
         };
+        let mut new_backing = self.shared_tapes[selected_tape_idx].backing.add_segment()?;
 
         let num_entries = source.len();
         fill_backing(source, &mut new_backing)?;
@@ -149,6 +147,19 @@ impl<T> Tape<T> {
     }
     pub fn into_backing(self) -> T {
         self.backing
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn vec_to_tape<T>(mut data: Vec<T>) -> Tape<std::io::Cursor<Vec<u8>>> {
+    let mut backing = Vec::new();
+    let num_entries = data.len();
+
+    fill_backing(&mut data, &mut backing).unwrap();
+
+    Tape {
+        backing: io::Cursor::new(backing),
+        num_entries,
     }
 }
 
