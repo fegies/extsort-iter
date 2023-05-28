@@ -5,7 +5,7 @@ let
     overlays = [ (import sources.rust-overlay) ];
   };
   overrideSet = {
-    extensions = [ "rust-analyzer" "rust-src" ] ++ (if useMiri then [ "miri" ] else [ ]);
+    extensions = [ "rust-analyzer" "rust-src" "llvm-tools-preview" ] ++ (if useMiri then [ "miri" ] else [ ]);
     # targets = [ "riscv64gc-unknown-none-elf" "x86_64-unknown-linux-gnu" ];
   };
   nightlyToolchain = toolchain: toolchain.default.override overrideSet;

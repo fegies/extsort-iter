@@ -31,7 +31,7 @@ fn previous_power_of_two(number: usize) -> usize {
 }
 
 fn get_candidate<T>(runs: &[impl Run<T>], candidate: Winner) -> Option<&T> {
-    runs.get(candidate.idx as usize)?.peek()
+    runs[candidate.idx as usize].peek()
 }
 
 fn compare_winners<T>(

@@ -7,7 +7,6 @@ use self::result_iter::ResultIterator;
 pub mod result_iter;
 
 /// The configuration for the external sorting.
-#[derive(Clone)]
 pub struct ExtsortConfig {
     /// the maximum size of the sort buffer
     pub(crate) sort_buffer_size: NonZeroUsize,

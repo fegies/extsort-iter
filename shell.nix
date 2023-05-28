@@ -7,5 +7,6 @@ pkgs.mkShell {
   buildInputs = [
     rust
     pkgs.lldb
+    pkgs.cargo-llvm-cov    
   ];
 }

@@ -220,6 +220,19 @@ mod test {
     }
 
     #[test]
+    fn test_drop() {
+        let vec: Vec<i32> = (1..5).collect();
+        let data: Vec<_> = core::iter::repeat(&vec).cloned().take(20).collect();
+        let tape = vec_to_tape(data);
+        let mut run: ExternalRun<Vec<i32>, _> =
+            ExternalRun::from_tape(tape, NonZeroUsize::new(4096).unwrap());
+        for _ in 0..10 {
+            run.next();
+        }
+        drop(run);
+    }
+
+    #[test]
     fn works_with_vecs() {
         let d = (1..100).collect::<Vec<_>>();
         let data = vec![d; 10];

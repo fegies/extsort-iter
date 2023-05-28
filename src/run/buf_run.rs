@@ -29,3 +29,16 @@ impl<T> Run<T> for BufRun<T> {
         self.source.len()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::run::Run;
+
+    use super::BufRun;
+
+    #[test]
+    fn test_remaining() {
+        let run: BufRun<()> = BufRun::new(vec![]);
+        assert_eq!(0, run.remaining_items())
+    }
+}

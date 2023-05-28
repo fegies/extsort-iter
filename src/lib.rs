@@ -62,22 +62,62 @@ pub use sorter::ExtsortConfig;
 #[cfg(not(miri))]
 #[cfg(test)]
 mod tests {
-    use crate::{extension_trait::ExtSortOrdExtension, sorter::ExtsortConfig};
+    use crate::{extension_trait::ExtSortOrdExtension, sorter::ExtsortConfig, ExtSortByExtension};
+
+    const TEST_SEQUENCE: [i32; 100] = [
+        2, 82, 29, 86, 100, 67, 44, 19, 25, 10, 84, 47, 65, 42, 11, 24, 53, 92, 69, 49, 70, 36, 8,
+        48, 16, 91, 62, 58, 55, 18, 27, 79, 76, 40, 22, 95, 99, 28, 17, 7, 59, 30, 97, 80, 34, 33,
+        54, 45, 31, 52, 56, 1, 57, 38, 61, 6, 23, 94, 85, 51, 35, 68, 41, 15, 90, 14, 74, 75, 32,
+        73, 83, 64, 77, 89, 4, 72, 71, 21, 63, 5, 39, 12, 20, 3, 43, 88, 26, 78, 93, 60, 50, 13,
+        37, 87, 46, 96, 66, 98, 81, 9,
+    ];
 
     #[test]
     fn integration() {
-        let sequence = [
-            2, 82, 29, 86, 100, 67, 44, 19, 25, 10, 84, 47, 65, 42, 11, 24, 53, 92, 69, 49, 70, 36,
-            8, 48, 16, 91, 62, 58, 55, 18, 27, 79, 76, 40, 22, 95, 99, 28, 17, 7, 59, 30, 97, 80,
-            34, 33, 54, 45, 31, 52, 56, 1, 57, 38, 61, 6, 23, 94, 85, 51, 35, 68, 41, 15, 90, 14,
-            74, 75, 32, 73, 83, 64, 77, 89, 4, 72, 71, 21, 63, 5, 39, 12, 20, 3, 43, 88, 26, 78,
-            93, 60, 50, 13, 37, 87, 46, 96, 66, 98, 81, 9,
-        ];
-
-        let data = sequence
+        let data = TEST_SEQUENCE
             .iter()
             .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(32))
             .unwrap();
+
+        let is_sorted = data.into_iter().zip(1..).all(|(l, r)| *l == r);
+
+        assert!(is_sorted);
+    }
+
+    #[test]
+    fn sort_zst() {
+        let data = [(), (), ()];
+        let sorted = data
+            .into_iter()
+            .external_sort_by_key(ExtsortConfig::default_for::<()>(), |_a| 1)
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(3, sorted.len())
+    }
+
+    #[test]
+    fn integration_sortby() {
+        let data = TEST_SEQUENCE
+            .iter()
+            .external_sort_by(
+                ExtsortConfig::create_with_buffer_size_for::<i32>(4096),
+                |a, b| a.cmp(b),
+            )
+            .unwrap();
+        let data = data.collect::<Vec<_>>();
+
+        let is_sorted = data.into_iter().zip(1..).all(|(l, r)| *l == r);
+
+        assert!(is_sorted);
+    }
+
+    #[test]
+    fn integration_sortby_key() {
+        let data = TEST_SEQUENCE
+            .iter()
+            .external_sort_by_key(ExtsortConfig::default_for::<i32>(), |a| *a)
+            .unwrap();
+        let data = data.collect::<Vec<_>>();
 
         let is_sorted = data.into_iter().zip(1..).all(|(l, r)| *l == r);
 
@@ -88,9 +128,10 @@ mod tests {
         let roundtripped = sequence
             .iter()
             .cloned()
-            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(
-                buffer_size,
-            ))
+            .external_sort(
+                ExtsortConfig::create_with_buffer_size_for::<i32>(buffer_size)
+                    .temp_file_folder("/dev/shm"),
+            )
             .unwrap()
             .collect::<Vec<_>>();
 
@@ -113,5 +154,26 @@ mod tests {
     fn test_tiny_buffer() {
         let sequence = (0..1000).collect();
         roundtrip_sequence(sequence, 1);
+    }
+
+    #[test]
+    fn test_sort_in_mem() {
+        let sequence = (0..10).collect();
+        roundtrip_sequence(sequence, 4096);
+    }
+
+    #[test]
+    fn test_remaining_len() {
+        let data = (0..500).collect::<Vec<_>>();
+        let mut sorted = data
+            .into_iter()
+            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(8))
+            .unwrap();
+        let mut result = vec![];
+        assert_eq!(500, sorted.len());
+        while let Some(next) = sorted.next() {
+            result.push(next);
+            assert_eq!(500 - result.len(), sorted.len());
+        }
     }
 }

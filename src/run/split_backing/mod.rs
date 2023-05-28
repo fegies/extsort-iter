@@ -88,3 +88,18 @@ where
         Ok(bytes_read)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::{Cursor, Write};
+
+    use super::SplitView;
+
+    #[test]
+    fn test_flush() {
+        let file = Cursor::new(vec![]);
+        let mut wrapper = SplitView::new(file).unwrap();
+        let mut view = wrapper.add_segment().unwrap();
+        view.flush().unwrap();
+    }
+}
