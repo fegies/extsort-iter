@@ -14,10 +14,14 @@ exclude = ["target/**"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-parallel_sort = ["rayon"]
+default = ["compression_lz4_flex"]
+parallel_sort = ["dep:rayon"]
+compression = []
+compression_lz4_flex = ["compression", "dep:lz4_flex"]
 
 [dependencies]
 rayon = {version = "1", optional = true}
+lz4_flex = {version = "0.11", optional = true }
 
 [dev-dependencies]
 rand = "0.8.5"

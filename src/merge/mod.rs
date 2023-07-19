@@ -212,7 +212,7 @@ mod test {
             result.push(next);
         }
 
-        let mut expected: Vec<_> = runs.iter().cloned().flatten().collect();
+        let mut expected: Vec<_> = runs.iter().flatten().cloned().collect();
         expected.sort();
 
         if expected != result {

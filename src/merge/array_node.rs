@@ -89,8 +89,7 @@ mod test {
 
     #[test]
     fn test_clone_to_make_coverage_happy() {
-        let _ = Winner { idx: 0 }.clone();
-        let _ = TreeNode { idx: 0 }.clone();
-        assert!(true)
+        let _ = Winner { idx: 0 };
+        let _ = TreeNode { idx: 0 };
     }
 }

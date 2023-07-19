@@ -222,7 +222,7 @@ mod test {
     #[test]
     fn test_drop() {
         let vec: Vec<i32> = (1..5).collect();
-        let data: Vec<_> = core::iter::repeat(&vec).cloned().take(20).collect();
+        let data: Vec<_> = core::iter::repeat(&vec).take(20).cloned().collect();
         let tape = vec_to_tape(data);
         let mut run: ExternalRun<Vec<i32>, _> =
             ExternalRun::from_tape(tape, NonZeroUsize::new(4096).unwrap());

@@ -113,7 +113,7 @@ mod test {
     fn assert_winner(tape: &[i64]) {
         let orderer = OrdOrderer {};
         let min_value = *tape.iter().min().unwrap();
-        let ref_tape = tape.iter().map(|i| i).collect::<Vec<_>>();
+        let ref_tape = tape.iter().collect::<Vec<_>>();
         let mut tree = Vec::new();
         let winner = LoserTreeBuilder::new(
             |a, b| orderer.compare(ref_tape[a.idx as usize], ref_tape[b.idx as usize]),
@@ -136,7 +136,7 @@ mod test {
             println!("constructing zero tree with {r} tapes");
             assert_winner(&vec![0; r]);
             println!("constructing ordered tree with {r} tapes");
-            let mut tape = (0..r as i64).into_iter().collect::<Vec<_>>();
+            let mut tape = (0..r as i64).collect::<Vec<_>>();
             assert_winner(&tape);
             println!("constructing reversed tree wtih {r} tapes");
             let mut reversed_tape = tape.clone();

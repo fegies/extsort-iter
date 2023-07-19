@@ -1,16 +1,23 @@
 use std::{io, num::NonZeroUsize, path::PathBuf};
 
-use crate::{orderer::Orderer, run::file_run::create_buffer_run, tape::TapeCollection};
+use crate::{
+    orderer::Orderer,
+    run::file_run::create_buffer_run,
+    tape::{compressor::CompressionCodec, TapeCollection},
+};
 
 use self::result_iter::ResultIterator;
 
 pub mod result_iter;
 
 /// The configuration for the external sorting.
+#[non_exhaustive]
 pub struct ExtsortConfig {
     /// the maximum size of the sort buffer
     pub(crate) sort_buffer_size: NonZeroUsize,
     pub temp_file_folder: PathBuf,
+    #[cfg(feature = "compression")]
+    pub compress_with: CompressionCodec,
 }
 
 impl ExtsortConfig {
@@ -29,6 +36,8 @@ impl ExtsortConfig {
         ExtsortConfig {
             sort_buffer_size: sort_count,
             temp_file_folder: PathBuf::from("/tmp"),
+            #[cfg(feature = "compression")]
+            compress_with: Default::default(),
         }
     }
     /// Creates a configuration with a sort buffer size of 10M
@@ -42,6 +51,22 @@ impl ExtsortConfig {
         Self {
             temp_file_folder: folder.into(),
             ..self
+        }
+    }
+    #[cfg(feature = "compression_lz4_flex")]
+    pub fn compress_lz4_flex(mut self) -> Self {
+        self.compress_with = CompressionCodec::Lz4Flex;
+        self
+    }
+
+    fn compression_choice(&self) -> CompressionCodec {
+        #[cfg(feature = "compression")]
+        {
+            self.compress_with
+        }
+        #[cfg(not(feature = "compression"))]
+        {
+            CompressionCodec::NoCompression
         }
     }
 }
@@ -70,9 +95,11 @@ impl ExtSorter {
         let max_buffer_size = self.config.sort_buffer_size.into();
         let mut sort_buffer = Vec::with_capacity(max_buffer_size);
 
+        let compression_choice = self.config.compression_choice();
         let mut tape_collection = TapeCollection::<T>::new(
             self.config.temp_file_folder,
             NonZeroUsize::new(256).unwrap(),
+            compression_choice,
         );
 
         let source = &mut source;

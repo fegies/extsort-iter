@@ -9,6 +9,9 @@ use std::{
 
 use crate::run::{file_run::ExternalRun, split_backing::SplitView};
 
+use self::compressor::CompressionCodec;
+
+pub mod compressor;
 mod file;
 
 pub struct TapeCollection<T> {
@@ -18,6 +21,7 @@ pub struct TapeCollection<T> {
     plain_tapes: Vec<Tape<File>>,
     shared_tapes: Vec<Tape<SplitView<File>>>,
     next_tape_idx: usize,
+    compression_choice: CompressionCodec,
 }
 
 impl<T> TapeCollection<T> {
@@ -29,12 +33,20 @@ impl<T> TapeCollection<T> {
 
         self.plain_tapes
             .into_iter()
-            .map(|t| t.box_backing())
-            .chain(self.shared_tapes.into_iter().map(|t| t.box_backing()))
+            .map(|t| t.box_backing(self.compression_choice))
+            .chain(
+                self.shared_tapes
+                    .into_iter()
+                    .map(|t| t.box_backing(self.compression_choice)),
+            )
             .map(|t| ExternalRun::from_tape(t, read_buffer_items))
             .collect()
     }
-    pub fn new(sort_folder: PathBuf, max_files: NonZeroUsize) -> Self {
+    pub fn new(
+        sort_folder: PathBuf,
+        max_files: NonZeroUsize,
+        compression_choice: CompressionCodec,
+    ) -> Self {
         let mut next_file_name = sort_folder;
         next_file_name.push("dummy");
         Self {
@@ -44,6 +56,7 @@ impl<T> TapeCollection<T> {
             phantom: PhantomData,
             plain_tapes: Vec::new(),
             shared_tapes: Vec::new(),
+            compression_choice,
         }
     }
     pub fn add_run(&mut self, source: &mut Vec<T>) -> io::Result<()> {
@@ -69,7 +82,7 @@ impl<T> TapeCollection<T> {
         let mut new_backing = self.shared_tapes[selected_tape_idx].backing.add_segment()?;
 
         let num_entries = source.len();
-        fill_backing(source, &mut new_backing)?;
+        fill_backing(source, &mut new_backing, self.compression_choice)?;
         self.shared_tapes.push(Tape {
             backing: new_backing.into(),
             num_entries,
@@ -87,7 +100,7 @@ impl<T> TapeCollection<T> {
         ));
         let mut file = file::create_file(&self.next_file_name)?;
         let num_entries = source.len();
-        fill_backing(source, &mut file)?;
+        fill_backing(source, &mut file, self.compression_choice)?;
 
         // seek to the beginning of the file to ensure that we will actually read its contents
         file.seek(io::SeekFrom::Start(0))?;
@@ -107,7 +120,11 @@ impl<T> TapeCollection<T> {
 /// Fills the provided file with the values drained from source.
 /// When the call completes successfully, source will be empty.
 /// If it fails, source will remain untouched.
-fn fill_backing<T, TBacking>(source: &mut Vec<T>, file: &mut TBacking) -> io::Result<()>
+fn fill_backing<T, TBacking>(
+    source: &mut Vec<T>,
+    file: &mut TBacking,
+    compress_choice: CompressionCodec,
+) -> io::Result<()>
 where
     TBacking: Write,
 {
@@ -121,7 +138,7 @@ where
     };
 
     // move the contents of the vec to the file.
-    file.write_all(slice)?;
+    compress_choice.write_all(file, slice)?;
 
     // we have conceptually moved all the data that our vec used to contain to disk.
     // in order to make sure that the drop functions are not called twice,
@@ -156,7 +173,7 @@ pub(crate) fn vec_to_tape<T>(mut data: Vec<T>) -> Tape<std::io::Cursor<Vec<u8>>>
     let mut backing = Vec::new();
     let num_entries = data.len();
 
-    fill_backing(&mut data, &mut backing).unwrap();
+    fill_backing(&mut data, &mut backing, CompressionCodec::NoCompression).unwrap();
 
     Tape {
         backing: io::Cursor::new(backing),
@@ -165,9 +182,9 @@ pub(crate) fn vec_to_tape<T>(mut data: Vec<T>) -> Tape<std::io::Cursor<Vec<u8>>>
 }
 
 impl<T: Read + 'static> Tape<T> {
-    fn box_backing(self) -> Tape<Box<dyn Read>> {
+    fn box_backing(self, compression_choice: CompressionCodec) -> Tape<Box<dyn Read>> {
         Tape {
-            backing: Box::new(self.backing),
+            backing: compression_choice.get_reader(self.backing),
             num_entries: self.num_entries,
         }
     }
