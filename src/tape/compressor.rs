@@ -22,7 +22,7 @@ impl CompressionCodec {
             }
         }
     }
-    pub fn get_reader(self, inner: impl Read + 'static) -> Box<dyn Read> {
+    pub fn get_reader(self, inner: impl Read + Send + 'static) -> Box<dyn Read + Send> {
         match self {
             CompressionCodec::NoCompression => Box::new(inner),
             #[cfg(feature = "compression_lz4_flex")]

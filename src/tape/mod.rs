@@ -25,7 +25,10 @@ pub struct TapeCollection<T> {
 }
 
 impl<T> TapeCollection<T> {
-    pub fn into_tapes(self, read_buffer_size: NonZeroUsize) -> Vec<ExternalRun<T, Box<dyn Read>>> {
+    pub fn into_tapes(
+        self,
+        read_buffer_size: NonZeroUsize,
+    ) -> Vec<ExternalRun<T, Box<dyn Read + Send>>> {
         let num_tapes = self.plain_tapes.len() + self.shared_tapes.len();
         let read_buffer_items = usize::from(read_buffer_size) / num_tapes;
         let one = NonZeroUsize::new(1).unwrap();
@@ -181,8 +184,8 @@ pub(crate) fn vec_to_tape<T>(mut data: Vec<T>) -> Tape<std::io::Cursor<Vec<u8>>>
     }
 }
 
-impl<T: Read + 'static> Tape<T> {
-    fn box_backing(self, compression_choice: CompressionCodec) -> Tape<Box<dyn Read>> {
+impl<T: Read + 'static + Send> Tape<T> {
+    fn box_backing(self, compression_choice: CompressionCodec) -> Tape<Box<dyn Read + Send>> {
         Tape {
             backing: compression_choice.get_reader(self.backing),
             num_entries: self.num_entries,

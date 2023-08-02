@@ -46,7 +46,7 @@ where
 
 /// Creates a new FileRun Object that uses the provided source as its
 /// buffer, but is not actually backed by anything on disk
-pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read>> {
+pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read + Send>> {
     let buffer: Vec<MaybeUninit<T>> = unsafe {
         // we are only transmuting our Vec<T> to Vec<MaybeUninit<T>>.
         // this is guaranteed to have the same binary representation.

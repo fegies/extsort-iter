@@ -1,7 +1,6 @@
 use std::{
-    cell::RefCell,
     io::{self, Read, Seek, SeekFrom, Write},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use self::backing_wrapper::BackingWrapper;
@@ -9,26 +8,27 @@ use self::backing_wrapper::BackingWrapper;
 mod backing_wrapper;
 
 pub struct SplitView<T> {
-    backing: Rc<RefCell<backing_wrapper::BackingWrapper<T>>>,
+    backing: Arc<Mutex<backing_wrapper::BackingWrapper<T>>>,
     // a past-the-end index of the current segment in the file
     segment_end: u64,
     // the current read position inside this segment
     current_index: u64,
 }
+
 impl<T> SplitView<T>
 where
-    T: Seek + Read,
+    T: Seek + Read + Send,
 {
     pub fn new(mut backing: T) -> io::Result<Self> {
         let segment_end = backing.seek(SeekFrom::End(0))?;
         Ok(Self {
-            backing: Rc::new(RefCell::new(BackingWrapper::new(backing))),
+            backing: Arc::new(Mutex::new(BackingWrapper::new(backing))),
             segment_end,
             current_index: 0,
         })
     }
     pub fn add_segment(&mut self) -> io::Result<SplitViewWrite<T>> {
-        let segment_start = self.backing.borrow_mut().seek(SeekFrom::End(0))?;
+        let segment_start = self.backing.lock().unwrap().seek(SeekFrom::End(0))?;
         Ok(SplitViewWrite {
             backing: self.backing.clone(),
             length: 0,
@@ -38,7 +38,7 @@ where
 }
 
 pub struct SplitViewWrite<T> {
-    backing: Rc<RefCell<BackingWrapper<T>>>,
+    backing: Arc<Mutex<BackingWrapper<T>>>,
     segment_start: u64,
     length: u64,
 }
@@ -60,14 +60,15 @@ where
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let bytes_written = self
             .backing
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .write_at(self.segment_start + self.length, buf)?;
         self.length += bytes_written as u64;
         Ok(bytes_written)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.backing.borrow_mut().flush()
+        self.backing.lock().unwrap().flush()
     }
 }
 
@@ -83,7 +84,7 @@ where
         if buf.is_empty() {
             return Ok(0);
         }
-        let bytes_read = self.backing.borrow_mut().read(self.current_index, buf)?;
+        let bytes_read = self.backing.lock().unwrap().read(self.current_index, buf)?;
         self.current_index += bytes_read as u64;
         Ok(bytes_read)
     }
