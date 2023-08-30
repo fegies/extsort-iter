@@ -13,7 +13,7 @@
 //! // and place the files under /tmp
 //! //
 //! // you will most likely want to change at least the location.
-//! let config = ExtsortConfig::default_for::<i32>();
+//! let config = ExtsortConfig::default();
 //!
 //! let data = sequence
 //!     .iter()
@@ -21,6 +21,21 @@
 //!     .external_sort(config)?
 //!     .collect::<Vec<_>>();
 //! assert_eq!(&data, &[3,5,9,21,42]);
+//!
+//! // you if you enable the compression_lz4_flex feature, the runs will be transparently compressed
+//! // using lz4 before being written to disk. This can help if you have a slow/small disk.
+//! # #[cfg(compression_lz4_flex)]
+//! let config = ExtsortConfig::default().compress_lz4_flex();
+//! # #[cfg(not(compression_lz4_flex))]
+//! # let config = ExtsortConfig::default();
+//!
+//! let data = sequence
+//!     .iter()
+//!     .cloned()
+//!     .external_sort(config)?
+//!     .collect::<Vec<_>>();
+//! assert_eq!(&data, &[3,5,9,21,42]);
+//!
 //! # Ok(())
 //! # }
 //! # #[cfg(miri)]
@@ -35,7 +50,7 @@
 //! # use extsort_iter::*;
 //! let data = "somestring".to_owned();
 //! let iterator = std::iter::from_fn(|| Some(data.clone())).take(1_000_000);
-//! let sorted  = iterator.external_sort(ExtsortConfig::default_for::<String>());
+//! let sorted  = iterator.external_sort(ExtsortConfig::default());
 //! ```
 //!
 //! The reason for that is that we are not dropping the values from the source iterator until they are
@@ -76,7 +91,7 @@ mod tests {
     fn integration() {
         let data = TEST_SEQUENCE
             .iter()
-            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(32))
+            .external_sort(ExtsortConfig::with_buffer_size(32))
             .unwrap();
 
         let is_sorted = data.into_iter().zip(1..).all(|(l, r)| *l == r);
@@ -89,7 +104,7 @@ mod tests {
         let data = [(), (), ()];
         let sorted = data
             .into_iter()
-            .external_sort_by_key(ExtsortConfig::default_for::<()>(), |_a| 1)
+            .external_sort_by_key(ExtsortConfig::new(), |_a| 1)
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(3, sorted.len())
@@ -99,10 +114,7 @@ mod tests {
     fn integration_sortby() {
         let data = TEST_SEQUENCE
             .iter()
-            .external_sort_by(
-                ExtsortConfig::create_with_buffer_size_for::<i32>(4096),
-                |a, b| a.cmp(b),
-            )
+            .external_sort_by(ExtsortConfig::with_buffer_size(4096), |a, b| a.cmp(b))
             .unwrap();
         let data = data.collect::<Vec<_>>();
 
@@ -115,7 +127,7 @@ mod tests {
     fn integration_sortby_key() {
         let data = TEST_SEQUENCE
             .iter()
-            .external_sort_by_key(ExtsortConfig::default_for::<i32>(), |a| *a)
+            .external_sort_by_key(ExtsortConfig::new(), |a| *a)
             .unwrap();
         let data = data.collect::<Vec<_>>();
 
@@ -129,8 +141,7 @@ mod tests {
             .iter()
             .cloned()
             .external_sort(
-                ExtsortConfig::create_with_buffer_size_for::<i32>(buffer_size)
-                    .temp_file_folder("/dev/shm"),
+                ExtsortConfig::with_buffer_size(buffer_size).temp_file_folder("/dev/shm"),
             )
             .unwrap()
             .collect::<Vec<_>>();
@@ -167,7 +178,7 @@ mod tests {
         let data = (0..500).collect::<Vec<_>>();
         let mut sorted = data
             .into_iter()
-            .external_sort(ExtsortConfig::create_with_buffer_size_for::<i32>(8))
+            .external_sort(ExtsortConfig::with_buffer_size(8))
             .unwrap();
         let mut result = vec![];
         assert_eq!(500, sorted.len());

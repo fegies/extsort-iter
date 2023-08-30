@@ -14,7 +14,7 @@ exclude = ["target/**"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["compression_lz4_flex"]
+default = []
 parallel_sort = ["dep:rayon"]
 compression = []
 compression_lz4_flex = ["compression", "dep:lz4_flex"]

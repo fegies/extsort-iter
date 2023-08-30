@@ -38,12 +38,13 @@
                   packages = with pkgs; [
                     rustfmt
                     cargo-watch
+                    cargo-llvm-cov
                   ];
 
                   languages.rust = {
                     enable = true;
                     channel = "stable";
-                    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src" ];
+                    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src" "llvm-tools-preview"];
                   };
 
 

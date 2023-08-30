@@ -14,36 +14,68 @@ pub mod result_iter;
 #[non_exhaustive]
 pub struct ExtsortConfig {
     /// the maximum size of the sort buffer
-    pub(crate) sort_buffer_size: NonZeroUsize,
+    pub(crate) sort_buffer_size_bytes: usize,
     pub temp_file_folder: PathBuf,
     #[cfg(feature = "compression")]
     pub compress_with: CompressionCodec,
 }
 
-impl ExtsortConfig {
-    /// Creates a configuration with a specified sort buffer size in bytes
-    /// and a sort directory of /tmp
-    pub fn create_with_buffer_size_for<T>(sort_buf_bytes: usize) -> Self {
-        let t_size = std::mem::size_of::<T>();
-
-        let one = NonZeroUsize::new(1).unwrap();
-        let sort_count = if t_size == 0 {
-            one
-        } else {
-            NonZeroUsize::new(sort_buf_bytes / t_size).unwrap_or(one)
-        };
-
-        ExtsortConfig {
-            sort_buffer_size: sort_count,
+impl Default for ExtsortConfig {
+    fn default() -> Self {
+        Self {
+            sort_buffer_size_bytes: 10_000_000,
             temp_file_folder: PathBuf::from("/tmp"),
             #[cfg(feature = "compression")]
             compress_with: Default::default(),
         }
     }
+}
+
+impl ExtsortConfig {
+    fn get_num_items_for<T>(&self) -> NonZeroUsize {
+        let t_size = std::mem::size_of::<T>();
+
+        let one = NonZeroUsize::new(1).unwrap();
+
+        if t_size == 0 {
+            one
+        } else {
+            NonZeroUsize::new(self.sort_buffer_size_bytes / t_size).unwrap_or(one)
+        }
+    }
+
     /// Creates a configuration with a sort buffer size of 10M
     /// and a sort directory of /tmp
+    ///
+    /// It is recommended to increase the sort buffer size
+    /// for improved performance.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Creates a configuration with a specified sort buffer size in bytes
+    /// and a sort directory of /tmp
+    pub fn with_buffer_size(sort_buf_bytes: usize) -> Self {
+        ExtsortConfig {
+            sort_buffer_size_bytes: sort_buf_bytes,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a configuration with a specified sort buffer size in bytes
+    /// and a sort directory of /tmp
+    #[deprecated = "Use new() or the Default impl instead. These do not require a type annotation"]
+    pub fn create_with_buffer_size_for<T>(sort_buf_bytes: usize) -> Self {
+        ExtsortConfig {
+            sort_buffer_size_bytes: sort_buf_bytes,
+            ..Default::default()
+        }
+    }
+    /// Creates a configuration with a sort buffer size of 10M
+    /// and a sort directory of /tmp
+    #[deprecated = "Use new() or the Default impl instead. These do not require a type annotation"]
     pub fn default_for<T>() -> Self {
-        Self::create_with_buffer_size_for::<T>(10_000_000)
+        Default::default()
     }
     /// Updates the temp_file_folder attribute.
     /// Useful for fluent-style api usage.
@@ -56,6 +88,12 @@ impl ExtsortConfig {
     #[cfg(feature = "compression_lz4_flex")]
     pub fn compress_lz4_flex(mut self) -> Self {
         self.compress_with = CompressionCodec::Lz4Flex;
+        self
+    }
+
+    /// sets the sort buffer size in bytes
+    pub fn sort_buffer_size(mut self, new_size: usize) -> Self {
+        self.sort_buffer_size_bytes = new_size;
         self
     }
 
@@ -92,7 +130,8 @@ impl ExtSorter {
         T: 'a,
         F: FnMut(&O, &mut [T]),
     {
-        let max_buffer_size = self.config.sort_buffer_size.into();
+        let max_buffer_size_nonzero = self.config.get_num_items_for::<T>();
+        let max_buffer_size = max_buffer_size_nonzero.get();
         let mut sort_buffer = Vec::with_capacity(max_buffer_size);
 
         let compression_choice = self.config.compression_choice();
@@ -135,7 +174,7 @@ impl ExtSorter {
         // implement NLL yet.
         drop(sort_buffer);
 
-        let tapes = tape_collection.into_tapes(self.config.sort_buffer_size);
+        let tapes = tape_collection.into_tapes(max_buffer_size_nonzero);
 
         Ok(ResultIterator::new(tapes, orderer))
     }
