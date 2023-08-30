@@ -20,7 +20,7 @@ let data = [1,42,3,41,5];
 
 // lets pretend this is an iterator that will not fit in memory completely
 let source = data.into_iter(); 
-let config = ExtsortConfig::default_for::<usize>();
+let config = ExtsortConfig::default();
 let iterator = data.external_sort(config);
 
 // do whatever you want with the sorted iterator
@@ -44,7 +44,7 @@ let iterator = data.external_sort_by_key(config, |a| a.trailing_ones());
 // it defaults to 10MB.
 // larger buffer sizes will drastically improve your sort performance, because only the
 // in-memory sort part is parallelized and the IO becomes more sequential
-let config = ExtsortConfig::create_with_buffer_size_for::<usize>(1_073_741_824);
+let config = ExtsortConfig::with_buffer_size(1_073_741_824);
 ```
 
 If you enable the `parallel_sort` feature, parallel versions of all sort function
@@ -63,6 +63,16 @@ let iterator = data.par_external_sort_by(config, |a,b| if a == 42 {
 
 // parallel sort using key extraction function
 let iterator = data.par_external_sort_by_key(config, |a| a.trailing_ones());
+```
+
+If you enable the compress_lz4_flex feature, you can enable transparent compression of your data
+for IO purposes:
+
+```rust
+let config = ExtsortConfig::default().compress_lz4_flex();
+
+// and then just sort as normal
+let iterator = data.par_external_sort(config);
 ```
 
 ## When not to use this crate
