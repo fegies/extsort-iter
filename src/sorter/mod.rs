@@ -5,11 +5,11 @@ use std::{
 };
 
 use crate::{
-    orderer::Orderer, run::file_run::create_buffer_run,
-    sorter::buffer_cleaner::BufferCleanerHandle, tape::compressor::CompressionCodec,
+    orderer::Orderer, run::file_run::create_buffer_run, sorter::buffer_cleaner::BufferCleaner,
+    tape::compressor::CompressionCodec,
 };
 
-use self::{buffer_cleaner::BufferCleaner, result_iter::ResultIterator};
+use self::result_iter::ResultIterator;
 
 pub mod buffer_cleaner;
 pub mod result_iter;
@@ -120,62 +120,65 @@ impl ExtSorter {
         Self {}
     }
 
-    pub fn run<'a, S, T, C, O>(
+    pub fn run<'a, S, T, C, O, F>(
         self,
         mut source: S,
-        buffer_cleaner: C,
+        mut buffer_cleaner: C,
     ) -> io::Result<ResultIterator<T, O>>
     where
         S: Iterator<Item = T>,
         T: 'a,
-        C: BufferCleaner<T, O>,
+        C: BufferCleaner<T, O, F>,
+        F: FnMut(&O, &mut [T]),
         O: Orderer<T>,
     {
-        buffer_cleaner.run(move |mut buffer_cleaner| {
-            let mut sort_buffer = buffer_cleaner.get_buffer();
+        let mut sort_buffer = buffer_cleaner.get_buffer();
 
-            let source = &mut source;
-            let mut any_buffer_was_flushed = false;
-            loop {
-                debug_assert!(sort_buffer.is_empty());
-                let capacity = sort_buffer.capacity();
-
-                sort_buffer.extend(source.take(capacity));
-                if sort_buffer.len() < capacity {
-                    // we could not completely fill the buffer, so we know that this
-                    // is the last run that will be generated.
-
-                    if !any_buffer_was_flushed {
-                        // we did not acually move anything to disk.
-                        // in this case we can just reuse the sort buffer
-                        // as a sort of pseudo tape.
-                        buffer_cleaner.sort_buffer(&mut sort_buffer);
-                        let (_tapes, orderer) = buffer_cleaner.finalize()?;
-                        let buffer_run = create_buffer_run(sort_buffer);
-                        return Ok(ResultIterator::new(vec![buffer_run], orderer));
-                    } else if !sort_buffer.is_empty() {
-                        // since we moved runs to disk, we will need to use memory for the read buffers.
-                        // to avoid going over budget, we move the final run to disk as well
-                        buffer_cleaner.clean_buffer(&mut sort_buffer)?;
-                    }
-                    break;
-                } else {
-                    buffer_cleaner.clean_buffer(&mut sort_buffer)?;
-                    any_buffer_was_flushed = true;
-                }
-            }
-
-            // at this point, we must have moved runs to disk, including the final sort buffer.
+        let source = &mut source;
+        let mut any_buffer_was_flushed = false;
+        loop {
             debug_assert!(sort_buffer.is_empty());
-            // it should not be necessary to manually drop the buffer here, but it sure does
-            // not hurt and this way we are guaranteed to have released the memory
-            // before initializing the tapes, even on compiler versions that do not
-            // implement NLL yet.
-            drop(sort_buffer);
+            let capacity = sort_buffer.capacity();
 
-            // wait for the io thread to be done writing and get the file handles back to the main thread
-            let (tapes, orderer) = buffer_cleaner.finalize()?;
-            Ok(ResultIterator::new(tapes, orderer))
-        })
+            sort_buffer.extend(source.take(capacity));
+            if sort_buffer.len() < capacity {
+                // we could not completely fill the buffer, so we know that this
+                // is the last run that will be generated.
+
+                if !any_buffer_was_flushed {
+                    // we did not acually move anything to disk.
+                    // in this case we can just reuse the sort buffer
+                    // as a sort of pseudo tape.
+                    let mut finalize_response = buffer_cleaner.finalize()?;
+                    let orderer = finalize_response.orderer;
+                    (finalize_response.sort_func)(&orderer, &mut sort_buffer);
+                    let buffer_run = create_buffer_run(sort_buffer);
+                    return Ok(ResultIterator::new(vec![buffer_run], orderer));
+                } else if !sort_buffer.is_empty() {
+                    // since we moved runs to disk, we will need to use memory for the read buffers.
+                    // to avoid going over budget, we move the final run to disk as well
+                    buffer_cleaner.clean_buffer(&mut sort_buffer)?;
+                }
+                break;
+            } else {
+                buffer_cleaner.clean_buffer(&mut sort_buffer)?;
+                any_buffer_was_flushed = true;
+            }
+        }
+
+        // at this point, we must have moved runs to disk, including the final sort buffer.
+        debug_assert!(sort_buffer.is_empty());
+        // it should not be necessary to manually drop the buffer here, but it sure does
+        // not hurt and this way we are guaranteed to have released the memory
+        // before initializing the tapes, even on compiler versions that do not
+        // implement NLL yet.
+        drop(sort_buffer);
+
+        // wait for the io thread to be done writing and get the file handles back to the main thread
+        let finalize_response = buffer_cleaner.finalize()?;
+        Ok(ResultIterator::new(
+            finalize_response.tapes,
+            finalize_response.orderer,
+        ))
     }
 }

@@ -40,6 +40,22 @@ where
     buffer.par_sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
+fn run<T, O>(
+    source: impl Iterator<Item = T>,
+    options: ExtsortConfig,
+    orderer: O,
+) -> io::Result<ParallelResultIterator<T, O>>
+where
+    O: Orderer<T> + Send + Sync,
+    T: Send,
+{
+    let cleaner = MultithreadedBufferCleaner::new(options, orderer, buffer_sort);
+    cleaner.run(move |cleaner_handle| {
+        let inner = sorter::ExtSorter::new().run(source, cleaner_handle)?;
+        Ok(ParallelResultIterator { inner })
+    })
+}
+
 pub trait ParallelExtSortOrdExtension: Iterator
 where
     Self::Item: Send,
@@ -99,9 +115,7 @@ where
         self,
         options: ExtsortConfig,
     ) -> io::Result<ParallelResultIterator<Self::Item, OrdOrderer>> {
-        let cleaner = MultithreadedBufferCleaner::new(options, OrdOrderer::new(), buffer_sort);
-        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
-        Ok(ParallelResultIterator { inner })
+        run(self, options, OrdOrderer::new())
     }
 }
 
@@ -118,10 +132,7 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering + Send + Sync,
     {
-        let cleaner =
-            MultithreadedBufferCleaner::new(options, FuncOrderer::new(comparator), buffer_sort);
-        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
-        Ok(ParallelResultIterator { inner })
+        run(self, options, FuncOrderer::new(comparator))
     }
 
     fn par_external_sort_by_key<F, K>(
@@ -133,9 +144,6 @@ where
         F: Fn(&Self::Item) -> K + Send + Sync,
         K: Ord,
     {
-        let cleaner =
-            MultithreadedBufferCleaner::new(options, KeyOrderer::new(key_extractor), buffer_sort);
-        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
-        Ok(ParallelResultIterator { inner })
+        run(self, options, KeyOrderer::new(key_extractor))
     }
 }

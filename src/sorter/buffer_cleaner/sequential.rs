@@ -4,6 +4,9 @@ use crate::{orderer::Orderer, tape::TapeCollection, ExtsortConfig};
 
 use super::*;
 
+///
+/// A simple sequential cleaner implementation.
+/// All trait methods on it just call the underlying functions directly.
 pub struct SingleThreadedBufferCleaner<T, O, F> {
     tape_collection: TapeCollection<T>,
     buffer_sort: F,
@@ -11,30 +14,12 @@ pub struct SingleThreadedBufferCleaner<T, O, F> {
     buffer_cap: NonZeroUsize,
 }
 
-impl<T, O, F> BufferCleaner<T, O> for SingleThreadedBufferCleaner<T, O, F>
+impl<T, O, F> BufferCleaner<T, O, F> for SingleThreadedBufferCleaner<T, O, F>
 where
     O: Orderer<T>,
     F: FnMut(&O, &mut [T]),
 {
-    type Handle = Self;
-
-    fn run<Fo, R>(self, func: Fo) -> R
-    where
-        Fo: FnOnce(Self::Handle) -> R,
-    {
-        func(self)
-    }
-}
-
-impl<T, O, F> BufferCleanerHandle<T, O> for SingleThreadedBufferCleaner<T, O, F>
-where
-    O: Orderer<T>,
-    F: FnMut(&O, &mut [T]),
-{
-    fn sort_buffer(&mut self, buffer: &mut Vec<T>) {
-        (self.buffer_sort)(&self.orderer, buffer)
-    }
-
+    /// cleans the provided sort buffer
     fn clean_buffer(&mut self, buffer: &mut Vec<T>) -> io::Result<()> {
         self.sort_buffer(buffer);
         self.tape_collection.add_run(buffer)
@@ -44,13 +29,21 @@ where
         Vec::with_capacity(self.buffer_cap.get())
     }
 
-    fn finalize(self) -> io::Result<(Vec<BoxedRun<T>>, O)> {
+    fn finalize(self) -> io::Result<FinalizeContents<T, O, F>> {
         let runs = self.tape_collection.into_tapes(self.buffer_cap);
-        Ok((runs, self.orderer))
+        let finalize_contents = FinalizeContents {
+            orderer: self.orderer,
+            sort_func: self.buffer_sort,
+            tapes: runs,
+        };
+        Ok(finalize_contents)
     }
 }
 
-impl<T, O, F> SingleThreadedBufferCleaner<T, O, F> {
+impl<T, O, F> SingleThreadedBufferCleaner<T, O, F>
+where
+    F: FnMut(&O, &mut [T]),
+{
     pub fn new(config: ExtsortConfig, orderer: O, buffer_sort: F) -> Self {
         let max_buffer_size_nonzero = config.get_num_items_for::<T>();
 
@@ -67,5 +60,9 @@ impl<T, O, F> SingleThreadedBufferCleaner<T, O, F> {
             orderer,
             buffer_cap: max_buffer_size_nonzero,
         }
+    }
+
+    fn sort_buffer(&mut self, buffer: &mut Vec<T>) {
+        (self.buffer_sort)(&self.orderer, buffer)
     }
 }

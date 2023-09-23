@@ -1,7 +1,11 @@
+use std::io::Read;
+
 #[cfg(test)]
 pub(crate) mod buf_run;
 pub mod file_run;
 pub mod split_backing;
+
+pub type BoxedRun<T> = file_run::ExternalRun<T, Box<dyn Read + Send>>;
 
 /// A run is a sequence of items in ascending order.
 pub trait Run<T> {

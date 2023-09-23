@@ -29,6 +29,18 @@ fn buffer_sort<T>(orderer: &impl Orderer<T>, buffer: &mut [T]) {
     buffer.sort_unstable_by(|a, b| orderer.compare(a, b));
 }
 
+fn run<T, O>(
+    source: impl Iterator<Item = T>,
+    options: ExtsortConfig,
+    orderer: O,
+) -> io::Result<ResultIterator<T, O>>
+where
+    O: Orderer<T>,
+{
+    let cleaner = SingleThreadedBufferCleaner::new(options, orderer, buffer_sort);
+    sorter::ExtSorter::new().run(source, cleaner)
+}
+
 impl<I, T> ExtSortOrdExtension for I
 where
     I: Iterator<Item = T>,
@@ -38,8 +50,7 @@ where
         self,
         options: ExtsortConfig,
     ) -> io::Result<ResultIterator<Self::Item, OrdOrderer>> {
-        let cleaner = SingleThreadedBufferCleaner::new(options, OrdOrderer::new(), buffer_sort);
-        sorter::ExtSorter::new().run(self, cleaner)
+        run(self, options, OrdOrderer::new())
     }
 }
 
@@ -89,9 +100,7 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering,
     {
-        let cleaner =
-            SingleThreadedBufferCleaner::new(options, FuncOrderer::new(comparator), buffer_sort);
-        sorter::ExtSorter::new().run(self, cleaner)
+        run(self, options, FuncOrderer::new(comparator))
     }
 
     fn external_sort_by_key<F, K>(
@@ -103,8 +112,6 @@ where
         F: Fn(&Self::Item) -> K,
         K: Ord,
     {
-        let cleaner =
-            SingleThreadedBufferCleaner::new(options, KeyOrderer::new(key_extractor), buffer_sort);
-        sorter::ExtSorter::new().run(self, cleaner)
+        run(self, options, KeyOrderer::new(key_extractor))
     }
 }
