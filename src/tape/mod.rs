@@ -30,6 +30,11 @@ impl<T> TapeCollection<T> {
         read_buffer_size: NonZeroUsize,
     ) -> Vec<ExternalRun<T, Box<dyn Read + Send>>> {
         let num_tapes = self.plain_tapes.len() + self.shared_tapes.len();
+
+        if num_tapes == 0 {
+            return Vec::new();
+        }
+
         let read_buffer_items = usize::from(read_buffer_size) / num_tapes;
         let one = NonZeroUsize::new(1).unwrap();
         let read_buffer_items = NonZeroUsize::new(read_buffer_items).unwrap_or(one);
@@ -113,10 +118,6 @@ impl<T> TapeCollection<T> {
             backing: file,
         });
         Ok(())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.plain_tapes.len() == 0 && self.shared_tapes.len() == 0
     }
 }
 

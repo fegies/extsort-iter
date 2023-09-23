@@ -6,7 +6,10 @@ use std::{
 use crate::{
     orderer::{FuncOrderer, KeyOrderer, OrdOrderer, Orderer},
     run::{file_run::ExternalRun, Run},
-    sorter::{self, result_iter::ResultIterator, ExtsortConfig},
+    sorter::{
+        self, buffer_cleaner::sequential::SingleThreadedBufferCleaner, result_iter::ResultIterator,
+        ExtsortConfig,
+    },
 };
 
 pub trait ExtSortOrdExtension: Iterator {
@@ -35,7 +38,8 @@ where
         self,
         options: ExtsortConfig,
     ) -> io::Result<ResultIterator<Self::Item, OrdOrderer>> {
-        sorter::ExtSorter::new(options).run(self, OrdOrderer::new(), buffer_sort)
+        let cleaner = SingleThreadedBufferCleaner::new(options, OrdOrderer::new(), buffer_sort);
+        sorter::ExtSorter::new().run(self, cleaner)
     }
 }
 
@@ -85,7 +89,9 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering,
     {
-        sorter::ExtSorter::new(options).run(self, FuncOrderer::new(comparator), buffer_sort)
+        let cleaner =
+            SingleThreadedBufferCleaner::new(options, FuncOrderer::new(comparator), buffer_sort);
+        sorter::ExtSorter::new().run(self, cleaner)
     }
 
     fn external_sort_by_key<F, K>(
@@ -97,6 +103,8 @@ where
         F: Fn(&Self::Item) -> K,
         K: Ord,
     {
-        sorter::ExtSorter::new(options).run(self, KeyOrderer::new(key_extractor), buffer_sort)
+        let cleaner =
+            SingleThreadedBufferCleaner::new(options, KeyOrderer::new(key_extractor), buffer_sort);
+        sorter::ExtSorter::new().run(self, cleaner)
     }
 }

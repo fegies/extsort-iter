@@ -4,7 +4,10 @@ use rayon::slice::ParallelSliceMut;
 
 use crate::{
     orderer::{FuncOrderer, KeyOrderer, OrdOrderer, Orderer},
-    sorter::{self, result_iter::ResultIterator, ExtsortConfig},
+    sorter::{
+        self, buffer_cleaner::threaded::MultithreadedBufferCleaner, result_iter::ResultIterator,
+        ExtsortConfig,
+    },
 };
 
 /// The specific iterator type returned by
@@ -96,7 +99,8 @@ where
         self,
         options: ExtsortConfig,
     ) -> io::Result<ParallelResultIterator<Self::Item, OrdOrderer>> {
-        let inner = sorter::ExtSorter::new(options).run(self, OrdOrderer::new(), buffer_sort)?;
+        let cleaner = MultithreadedBufferCleaner::new(options, OrdOrderer::new(), buffer_sort);
+        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
         Ok(ParallelResultIterator { inner })
     }
 }
@@ -114,8 +118,9 @@ where
     where
         F: Fn(&Self::Item, &Self::Item) -> Ordering + Send + Sync,
     {
-        let inner =
-            sorter::ExtSorter::new(options).run(self, FuncOrderer::new(comparator), buffer_sort)?;
+        let cleaner =
+            MultithreadedBufferCleaner::new(options, FuncOrderer::new(comparator), buffer_sort);
+        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
         Ok(ParallelResultIterator { inner })
     }
 
@@ -128,11 +133,9 @@ where
         F: Fn(&Self::Item) -> K + Send + Sync,
         K: Ord,
     {
-        let inner = sorter::ExtSorter::new(options).run(
-            self,
-            KeyOrderer::new(key_extractor),
-            buffer_sort,
-        )?;
+        let cleaner =
+            MultithreadedBufferCleaner::new(options, KeyOrderer::new(key_extractor), buffer_sort);
+        let inner = sorter::ExtSorter::new().run(self, cleaner)?;
         Ok(ParallelResultIterator { inner })
     }
 }
