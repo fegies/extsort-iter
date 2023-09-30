@@ -88,6 +88,13 @@ where
         let tape_exhausted = winning_tape.peek().is_none();
 
         self.winner = if tape_exhausted {
+            // while we surely know that the next result must be a None
+            // because the peek call did not return anything,
+            // reading the tape past the end will allow it to release
+            // backing resources already.
+            let none = winning_tape.next();
+            debug_assert!(none.is_none());
+
             self.remove_winner(self.winner)
         } else {
             self.replay_matches(self.winner)

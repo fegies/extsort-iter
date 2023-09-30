@@ -90,7 +90,7 @@ impl<I, T> ExtSortByExtension for I
 where
     I: Iterator<Item = T>,
 {
-    type Run = ExternalRun<T, Box<dyn Read>>;
+    type Run = ExternalRun<T, Box<dyn Read + Send>>;
 
     fn external_sort_by<F>(
         self,

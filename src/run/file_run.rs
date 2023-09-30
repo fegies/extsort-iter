@@ -8,13 +8,30 @@ use crate::tape::Tape;
 
 use super::Run;
 
+/// A backing for a run. Basically, we extend the Read trait
+/// with an option for premature resource release
+pub trait RunBacking: Read {
+    /// allow the backing to optionally free resources.
+    /// after this, no more data should be returned
+    fn finalize(&mut self);
+}
+impl RunBacking for Box<dyn Read + Send> {
+    fn finalize(&mut self) {
+        // for boxed backings, we can release the underlying resources
+        // by replacing it with a dummy implementation.
+        // this will drop the old value.
+        let dummy = Box::new(io::Cursor::new(&[]));
+        *self = dummy;
+    }
+}
+
 /// A run backed by a file on disk.
 /// The file is deleted when the run is dropped.
 /// Our TBacking type will be File for the real
 /// usage in the library and Cursor for testing
 pub struct ExternalRun<T, TBacking>
 where
-    TBacking: Read,
+    TBacking: RunBacking,
 {
     /// the source file that is backing our run.
     source: TBacking,
@@ -33,7 +50,7 @@ where
 
 impl<T, B> Drop for ExternalRun<T, B>
 where
-    B: Read,
+    B: RunBacking,
 {
     fn drop(&mut self) {
         // if the
@@ -65,7 +82,7 @@ pub fn create_buffer_run<T>(source: Vec<T>) -> ExternalRun<T, Box<dyn Read + Sen
 
 impl<T, TBacking> ExternalRun<T, TBacking>
 where
-    TBacking: Read,
+    TBacking: RunBacking,
 {
     pub fn from_tape(tape: Tape<TBacking>, buffer_size: NonZeroUsize) -> Self {
         let num_entries = tape.num_entries();
@@ -86,6 +103,7 @@ where
 
         res
     }
+
     /// refills the read buffer.
     /// this should only be called if the read_idx is at the end of the buffer
     ///
@@ -148,7 +166,7 @@ where
 
 impl<T, TBacking> Run<T> for ExternalRun<T, TBacking>
 where
-    TBacking: Read,
+    TBacking: RunBacking,
 {
     /// Peek at the next entry in the run
     fn peek(&self) -> Option<&T> {
@@ -166,6 +184,7 @@ where
     /// Get the next item from the run and advance its position
     fn next(&mut self) -> Option<T> {
         if self.remaining_entries == 0 {
+            self.source.finalize();
             return None;
         }
 
@@ -202,6 +221,15 @@ where
 #[cfg(test)]
 mod test {
     use std::fmt::Debug;
+
+    impl RunBacking for std::io::Cursor<Vec<u8>> {
+        fn finalize(&mut self) {
+            // for a cursor, we just set it to the end of the buffer.
+            // like this, it will also not yield any bytes anymore.
+            let len = self.get_ref().len();
+            self.set_position(len as u64);
+        }
+    }
 
     use crate::tape::vec_to_tape;
 
