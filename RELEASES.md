@@ -1,3 +1,10 @@
+## 0.3.1
+This is a release only improving crate internals with no changes to the public interface
+### Changed:
+- Changed the buffer flush strategy to write on a background thread while the main thread
+    can resume filling the buffer
+- Close (and delete) sort files as soon as they are exhausted, not just on next tree rebuild
+
 ## 0.3.0
 ### New:
 - The returned Iterator is now `Send` where possible

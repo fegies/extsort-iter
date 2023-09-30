@@ -1,4 +1,4 @@
-# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE) [![Rust](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml) [![docs.rs](https://img.shields.io/docsrs/extsort-iter)](https://docs.rs/extsort-iter) ![Crates.io](https://img.shields.io/crates/v/extsort-iter)
+# extsort-iter [![license](https://img.shields.io/github/license/fegies/extsort-iter.svg)](https://github.com/fegies/extsort-iter/blob/master/LICENSE) [![Rust](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/fegies/extsort-iter/actions/workflows/rust.yml) [![docs.rs](https://img.shields.io/docsrs/extsort-iter)](https://docs.rs/extsort-iter) [![Crates.io](https://img.shields.io/crates/v/extsort-iter)](https://crates.io/crates/extsort-iter)
 
 ### Sort iterators of any type as long as they fit on your disk!
 

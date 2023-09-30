@@ -62,7 +62,7 @@ where
         }
     }
 
-    fn sort_buffer(&mut self, buffer: &mut Vec<T>) {
+    fn sort_buffer(&mut self, buffer: &mut [T]) {
         (self.buffer_sort)(&self.orderer, buffer)
     }
 }
