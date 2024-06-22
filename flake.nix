@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     systems.url = "github:nix-systems/default";
     fenix = {
       url = "github:nix-community/fenix";
@@ -43,8 +43,17 @@
 
                   languages.rust = {
                     enable = true;
-                    channel = "stable";
-                    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src" "llvm-tools-preview"];
+                    channel = "nightly";
+                    components = [
+                      "rustc"
+                      "cargo"
+                      "clippy"
+                      "rustfmt"
+                      "rust-analyzer"
+                      "rust-src"
+                      "llvm-tools-preview"
+                      "miri"
+                    ];
                   };
 
 

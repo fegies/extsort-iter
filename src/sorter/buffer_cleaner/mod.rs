@@ -4,7 +4,7 @@ use crate::{orderer::Orderer, run::BoxedRun};
 
 pub mod sequential;
 
-#[cfg(any(feature = "parallel_sort", feature = "docsrs"))]
+#[cfg(feature = "parallel_sort")]
 pub mod threaded;
 
 /// A struct to get the finalization results
